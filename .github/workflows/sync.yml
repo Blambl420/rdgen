@@ -1,0 +1,24 @@
+name: Sync upstream
+
+on:
+  schedule:
+    - cron: "0 0 * * *"   # jednou denně o půlnoci UTC
+  workflow_dispatch:       # možnost spustit ručně
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync fork with upstream
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: master
+        run: |
+          gh api \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            /repos/${{ github.repository }}/merge-upstream \
+            -f branch=$BRANCH
