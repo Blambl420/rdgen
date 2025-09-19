@@ -3,22 +3,25 @@ name: Sync upstream
 on:
   schedule:
     - cron: "0 0 * * *"   # jednou denně o půlnoci UTC
-  workflow_dispatch:       # možnost spustit ručně
+  workflow_dispatch:
 
+# permissions zde ovlivňují jen GITHUB_TOKEN; pro PAT nejsou potřeba,
+# ale neuškodí je nechat:
 permissions:
   contents: write
 
 jobs:
   sync:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.PAT_SYNC }}   # <<< PAT místo GITHUB_TOKEN
+      BRANCH: master                      # nebo main dle upstreamu
     steps:
       - name: Sync fork with upstream
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BRANCH: master
         run: |
           gh api \
             -X POST \
             -H "Accept: application/vnd.github+json" \
             /repos/${{ github.repository }}/merge-upstream \
-            -f branch=$BRANCH
+            -f branch="$BRANCH" \
+            --fail-with-body
