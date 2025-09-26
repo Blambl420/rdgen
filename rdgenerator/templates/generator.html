@@ -92,6 +92,25 @@
         .platform-icon:hover, .platform-icon.active {
             color: #2e52f7;
         }
+        .text-64 {
+            font-size: 0.5em; 
+            font-weight: bold;
+            bottom: -0.2em; 
+            right: -0.2em;
+            position: absolute; 
+            color: white;
+            transform: translate(-50%, -50%);
+        }
+
+        .text-32 {
+            font-size: 0.5em;
+            font-weight: bold;
+            bottom: -0.2em;
+            right: -0.2em;
+            position: absolute;
+            color: white;
+            transform: translate(-50%, -50%);
+        }
         .checkbox-group {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -227,13 +246,21 @@
         <div class="platform">
             <h2><i class="fas fa-desktop"></i> Select Platform</h2>
                 <div class="platform-icons">
-                    <i class="fab fa-windows platform-icon active" data-platform="windows"></i>
+                    <span class="fa-stack fa-lg">
+                        <i class="fab fa-windows  fa-stack-2x platform-icon active" data-platform="windows"></i>
+                        <strong class="fa-stack-1x text-64">64</strong>
+                    </span>
+                    <span class="fa-stack fa-lg">
+                        <i class="fab fa-windows  fa-stack-2x platform-icon active" data-platform="windows-x86"></i>
+                        <strong class="fa-stack-1x text-32">32</strong>
+                    </span>
                     <i class="fab fa-linux platform-icon" data-platform="linux"></i>
                     <i class="fab fa-android platform-icon" data-platform="android"></i>
                     <i class="fab fa-apple platform-icon" data-platform="macos"></i>
                 </div>
                 <select name="platform" id="id_platform">
-                    <option value="windows" selected>Windows</option>
+                    <option value="windows" selected>Windows 64Bit</option>
+                    <option value="windows-x86">Windows 32Bit</option>
                     <option value="linux">Linux</option>
                     <option value="android">Android</option>
                     <option value="macos">macOS</option>
@@ -294,7 +321,9 @@
                     
                     <label for="{{ form.enableDirectIP.id_for_label }}">{{ form.enableDirectIP }} Enable direct IP access</label><br>
                     
-                    <label for="{{ form.autoClose.id_for_label }}">{{ form.autoClose }} Automatically close incoming sessions on user inactivity</label><br>  
+                    <label for="{{ form.autoClose.id_for_label }}">{{ form.autoClose }} Automatically close incoming sessions on user inactivity</label><br>
+
+                    <label for="{{ form.hidecm.id_for_label }}">{{ form.hidecm }} Allow hiding the connection window from remote screen.</label><br>
             </div>
         
             <div class="section">
@@ -330,11 +359,13 @@
                         <label for="{{ form.enableRecording.id_for_label }}">{{ form.enableRecording }} Enable recording session</label>
                         <label for="{{ form.enableBlockingInput.id_for_label }}">{{ form.enableBlockingInput }} Enable blocking user input</label>
                         <label for="{{ form.enableRemoteModi.id_for_label }}">{{ form.enableRemoteModi }} Enable remote configuration modification</label>
+                        <label for="{{ form.enablePrinter.id_for_label }}">{{ form.enablePrinter }} Enable remote printer</label>
+                        <label for="{{ form.enableCamera.id_for_label }}">{{ form.enableCamera }} Enable remote camera</label>
+                        <label for="{{ form.enableTerminal.id_for_label }}">{{ form.enableTerminal }} Enable remote terminal</label>
                     </div><br>
                 <h2><i class="fas fa-code"></i> Code Changes</h2>
                     <label for="{{ form.cycleMonitor.id_for_label }}">{{ form.cycleMonitor }} Add a button to cycle through available monitors to the minimized toolbar.</label><br>
                     <label for="{{ form.xOffline.id_for_label }}">{{ form.xOffline }} Display an X for offline devices in the addressbook.</label><br>
-                    <label for="{{ form.hidecm.id_for_label }}">{{ form.hidecm }} Allow hiding the connection window from remote screen.</label><br>
                     <label for="{{ form.removeNewVersionNotif.id_for_label }}">{{ form.removeNewVersionNotif }} Remove notification for new versions.</label><br>
             </div>
 
@@ -404,6 +435,9 @@
         const enableRecording = document.getElementById("{{ form.enableRecording.id_for_label }}");
         const enableBlockingInput = document.getElementById("{{ form.enableBlockingInput.id_for_label }}");
         const enableRemoteModi = document.getElementById("{{ form.enableRemoteModi.id_for_label }}");
+        const enablePrinter = document.getElementById("{{ form.enablePrinter.id_for_label }}");
+        const enableCamera = document.getElementById("{{ form.enableCamera.id_for_label }}");
+        const enableTerminal = document.getElementById("{{ form.enableTerminal.id_for_label }}");
 
         document.getElementById("{{ form.permissionsType.id_for_label }}").addEventListener('change', function() {
             if (this.value === 'full') {
@@ -416,6 +450,9 @@
                 enableRecording.checked = true;
                 enableBlockingInput.checked = true;
                 enableRemoteModi.checked = true;
+                enablePrinter.checked = true;
+                enableCamera.checked = true;
+                enableTerminal.checked = true;
 
                 enableKeyboard.disabled = true;
                 enableClipboard.disabled = true;
@@ -426,6 +463,9 @@
                 enableRecording.disabled = true;
                 enableBlockingInput.disabled = true;
                 enableRemoteModi.disabled = true;
+                enablePrinter.disabled = true;
+                enableCamera.disabled = true;
+                enableTerminal.disable = true;
             } else if (this.value === 'view') {
                 enableKeyboard.checked = false;
                 enableClipboard.checked = false;
@@ -436,6 +476,9 @@
                 enableRecording.checked = false;
                 enableBlockingInput.checked = false;
                 enableRemoteModi.checked = false;
+                enablePrinter.checked = false;
+                enableCamera.checked = false;
+                enableTerminal.checked = false;
 
                 enableKeyboard.disabled = true;
                 enableClipboard.disabled = true;
@@ -446,6 +489,9 @@
                 enableRecording.disabled = true;
                 enableBlockingInput.disabled = true;
                 enableRemoteModi.disabled = true;
+                enablePrinter.disabled = true;
+                enableCamera.disabled = true;
+                enableTerminal.disable = true;
             } else if (this.value === 'custom') {
                 enableKeyboard.disabled = false;
                 enableClipboard.disabled = false;
@@ -456,6 +502,9 @@
                 enableRecording.disabled = false;
                 enableBlockingInput.disabled = false;
                 enableRemoteModi.disabled = false;
+                enablePrinter.checked = false;
+                enableCamera.checked = false;
+                enableTerminal.checked = false;
             }
         });
         function previewImage(input, previewContainerId) {

@@ -74,6 +74,9 @@ def generator_view(request):
             removeWallpaper = form.cleaned_data['removeWallpaper']
             defaultManual = form.cleaned_data['defaultManual']
             overrideManual = form.cleaned_data['overrideManual']
+            enablePrinter = form.cleaned_data['enablePrinter']
+            enableCamera = form.cleaned_data['enableCamera']
+            enableTerminal = form.cleaned_data['enableTerminal']
 
             if all(char.isascii() for char in filename):
                 filename = re.sub(r'[^\w\s-]', '_', filename).strip()
@@ -119,14 +122,18 @@ def generator_view(request):
                 decodedCustom['password'] = permPass
             if theme != "system":
                 if themeDorO == "default":
-                    decodedCustom['default-settings']['theme'] = theme
+                    if platform == "windows-x86":
+                        decodedCustom['default-settings']['allow-darktheme'] = 'Y' if theme == "dark" else 'N'
+                    else:
+                        decodedCustom['default-settings']['theme'] = theme
                 elif themeDorO == "override":
-                    decodedCustom['override-settings']['theme'] = theme
-            #decodedCustom['approve-mode'] = passApproveMode
+                    if platform == "windows-x86":
+                        decodedCustom['override-settings']['allow-darktheme'] = 'Y' if theme == "dark" else 'N'
+                    else:
+                        decodedCustom['override-settings']['theme'] = theme
             decodedCustom['enable-lan-discovery'] = 'N' if denyLan else 'Y'
             #decodedCustom['direct-server'] = 'Y' if enableDirectIP else 'N'
             decodedCustom['allow-auto-disconnect'] = 'Y' if autoClose else 'N'
-            decodedCustom['allow-remove-wallpaper'] = 'Y' if removeWallpaper else 'N'
             if permissionsDorO == "default":
                 decodedCustom['default-settings']['access-mode'] = permissionsType
                 decodedCustom['default-settings']['enable-keyboard'] = 'Y' if enableKeyboard else 'N'
@@ -139,9 +146,13 @@ def generator_view(request):
                 decodedCustom['default-settings']['enable-block-input'] = 'Y' if enableBlockingInput else 'N'
                 decodedCustom['default-settings']['allow-remote-config-modification'] = 'Y' if enableRemoteModi else 'N'
                 decodedCustom['default-settings']['direct-server'] = 'Y' if enableDirectIP else 'N'
-                decodedCustom['default-settings']['hide-cm'] = 'Y' if hidecm else 'N'
                 decodedCustom['default-settings']['verification-method'] = 'use-permanent-password' if hidecm else 'use-both-passwords'
                 decodedCustom['default-settings']['approve-mode'] = passApproveMode
+                decodedCustom['default-settings']['allow-hide-cm'] = 'Y' if hidecm else 'N'
+                decodedCustom['default-settings']['allow-remove-wallpaper'] = 'Y' if removeWallpaper else 'N'
+                decodedCustom['default-settings']['enable-remote-printer'] = 'Y' if enablePrinter else 'N'
+                decodedCustom['default-settings']['enable-camera'] = 'Y' if enableCamera else 'N'
+                decodedCustom['default-settings']['enable-terminal'] = 'Y' if enableTerminal else 'N'
             else:
                 decodedCustom['override-settings']['access-mode'] = permissionsType
                 decodedCustom['override-settings']['enable-keyboard'] = 'Y' if enableKeyboard else 'N'
@@ -153,6 +164,14 @@ def generator_view(request):
                 decodedCustom['override-settings']['enable-record-session'] = 'Y' if enableRecording else 'N'
                 decodedCustom['override-settings']['enable-block-input'] = 'Y' if enableBlockingInput else 'N'
                 decodedCustom['override-settings']['allow-remote-config-modification'] = 'Y' if enableRemoteModi else 'N'
+                decodedCustom['override-settings']['direct-server'] = 'Y' if enableDirectIP else 'N'
+                decodedCustom['override-settings']['verification-method'] = 'use-permanent-password' if hidecm else 'use-both-passwords'
+                decodedCustom['override-settings']['approve-mode'] = passApproveMode
+                decodedCustom['override-settings']['allow-hide-cm'] = 'Y' if hidecm else 'N'
+                decodedCustom['override-settings']['allow-remove-wallpaper'] = 'Y' if removeWallpaper else 'N'
+                decodedCustom['override-settings']['enable-remote-printer'] = 'Y' if enablePrinter else 'N'
+                decodedCustom['override-settings']['enable-camera'] = 'Y' if enableCamera else 'N'
+                decodedCustom['override-settings']['enable-terminal'] = 'Y' if enableTerminal else 'N'
 
             for line in defaultManual.splitlines():
                 k, value = line.split('=')
@@ -179,16 +198,17 @@ def generator_view(request):
             extras['rdgen'] = 'true'
             extras['cycleMonitor'] = 'true' if cycleMonitor else 'false'
             extras['xOffline'] = 'true' if xOffline else 'false'
-            extras['hidecm'] = 'true' if hidecm else 'false'
             extras['removeNewVersionNotif'] = 'true' if removeNewVersionNotif else 'false'
             extras['compname'] = compname
             extra_input = json.dumps(extras)
 
             ####from here run the github action, we need user, repo, access token.
             if platform == 'windows':
-                url = 'https://api.github.com/repos/'+_settings.GHUSER+'/'+_settings.REPONAME+'/actions/workflows/generator-windows.yml/dispatches' 
+                url = 'https://api.github.com/repos/'+_settings.GHUSER+'/'+_settings.REPONAME+'/actions/workflows/generator-windows.yml/dispatches'
+            if platform == 'windows-x86':
+                url = 'https://api.github.com/repos/'+_settings.GHUSER+'/'+_settings.REPONAME+'/actions/workflows/generator-windows-x86.yml/dispatches'
             elif platform == 'linux':
-                url = 'https://api.github.com/repos/'+_settings.GHUSER+'/'+_settings.REPONAME+'/actions/workflows/generator-linux.yml/dispatches'  
+                url = 'https://api.github.com/repos/'+_settings.GHUSER+'/'+_settings.REPONAME+'/actions/workflows/generator-linux.yml/dispatches'
             elif platform == 'android':
                 url = 'https://api.github.com/repos/'+_settings.GHUSER+'/'+_settings.REPONAME+'/actions/workflows/generator-android.yml/dispatches'
             elif platform == 'macos':
