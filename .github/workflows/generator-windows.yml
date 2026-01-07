@@ -195,6 +195,8 @@ jobs:
           sed -i -e 's|"rustdesk.exe"|"${{ inputs.filename }}"|' ./flutter/windows/runner/Runner.rc
           sed -i -e 's|"RustDesk"|"${{ inputs.appname }}"|' ./flutter/windows/runner/Runner.rc
           # ./src/lang/en.rs
+          # change powered by rustdek to powered by compname
+          sed -i -e 's|Powered by RustDesk|Powered by ${{ fromJson(inputs.extras).compname }}|' ./src/lang/en.rs
           find ./src/lang -name "*.rs" -exec sed -i -e 's|RustDesk|${{ inputs.appname }}|' {} \;
 
       - name: fix registry if appname has a space
@@ -362,21 +364,16 @@ jobs:
           fi
           head -n 100 "${VCPKG_ROOT}/buildtrees/ffmpeg/build-${{ matrix.job.vcpkg-triplet }}-rel-out.log" || true
         shell: bash
-
-      - name: icon stuff
-        if: ${{ inputs.iconlink != 'false' }}
-        continue-on-error: true
-        shell: bash
-        run: |
-          mv ./res/icon.ico ./res/icon.ico.bak
-          mv ./res/icon.png ./res/icon.png.bak
-          mv ./res/tray-icon.ico ./res/tray-icon.ico.bak
-
+          
       - name: magick stuff
         if: ${{ inputs.iconlink != 'false' }}
         continue-on-error: true
         run: |
-          Invoke-WebRequest -Uri ${{ fromJson(inputs.iconlink).url }}/get_png?filename=${{ fromJson(inputs.iconlink).file }}"&"uuid=${{ fromJson(inputs.iconlink).uuid }} -OutFile ./res/icon.png 
+          Invoke-WebRequest -Uri ${{ fromJson(inputs.iconlink).url }}/get_png?filename=${{ fromJson(inputs.iconlink).file }}"&"uuid=${{ fromJson(inputs.iconlink).uuid }} -OutFile ./res/iconx.png 
+          mv ./res/icon.ico ./res/icon.ico.bak
+          mv ./res/icon.png ./res/icon.png.bak
+          mv ./res/tray-icon.ico ./res/tray-icon.ico.bak
+          mv ./res/iconx.png ./res/icon.png
           mv ./res/32x32.png ./res/32x32.png.bak
           mv ./res/64x64.png ./res/64x64.png.bak
           mv ./res/128x128.png ./res/128x128.png.bak
