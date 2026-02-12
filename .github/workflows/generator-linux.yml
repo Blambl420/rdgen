@@ -41,13 +41,18 @@ env:
   STATUS_URL: "${{ secrets.GENURL }}/updategh"
 
 jobs:
+  setup:
+    uses: ./.github/workflows/fetch-encrypted-secrets.yml
+    with:
+      zip_url_json: ${{ inputs.zip_url }}
+
   generate-bridge-linux:
     uses: ./.github/workflows/bridge.yml
     with:
       version: ${{ inputs.version }}
 
   build-rustdesk-linux:
-    needs: [generate-bridge-linux]
+    needs: [generate-bridge-linux, setup]
     name: build rustdesk linux ${{ matrix.job.target }}
     runs-on: ${{ matrix.job.on }}
     strategy:
@@ -72,48 +77,17 @@ jobs:
             vcpkg-triplet: arm64-linux,
           }
     steps:
-      - name: install python deps
-        run: |
-          pip install requests pyzipper
-      - name: Download, Decrypt, and Mask
-        shell: python
-        run: |
-          import requests
-          import pyzipper
-          import io
-          import os
-          import json
-          import time
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        
+      - uses: actions/download-artifact@v4
+        with:
+          name: encrypted-secrets-zip
 
-          for attempt in range(5):
-            try:
-              print(f"Downloading secrets (Attempt {attempt + 1})...")
-              r = requests.get('${{ fromJson(inputs.zip_url).url }}/get_zip?filename=${{ fromJson(inputs.zip_url).file }}', timeout=60)
-              r.raise_for_status()
-              break
-            except (requests.exceptions.RequestException, requests.exceptions.Timeout) as e:
-              if attempt < 4:
-                print(f"Timeout/Error occurred: {e}. Retrying in 5 seconds...")
-                time.sleep(30)
-              else:
-                print("Max retries reached. Failing.")
-                raise e
-          
-          try:
-            with pyzipper.AESZipFile(io.BytesIO(r.content)) as zf:
-              zf.setpassword('${{ secrets.ZIP_PASSWORD }}'.encode())
-              with zf.open('secrets.json') as f:
-                secrets = json.load(f)
-          except Exception as e:
-            print(f"Error: Could not decrypt ZIP. Check if password matches. {e}")
-            exit(1)
-
-          with open(os.environ['GITHUB_ENV'], 'a') as env_file:
-            for key, value in secrets.items():
-              print(f"::add-mask::{value}")
-              env_file.write(f"{key}={value}\n")
-          
-          print("Secrets loaded into environment.")
+      - name: Load Secrets
+        uses: ./.github/actions/decrypt-secrets
+        with:
+          zip_password: ${{ secrets.ZIP_PASSWORD }}
 
       - name: Export GitHub Actions cache environment variables
         uses: actions/github-script@v6
@@ -605,21 +579,27 @@ jobs:
 
       - name: send file to rdgen server
         if: ${{ env.rdgen == 'true' }}
-        shell: bash
-        run: |
-          curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-${{ matrix.job.arch }}.deb" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
-          curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-${{ matrix.job.arch }}.rpm" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
-          curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-suse-${{ matrix.job.arch }}.rpm" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
-          curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-${{ matrix.job.arch }}.pkg.tar.zst" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client || true
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          shell: bash
+          command: |
+            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-${{ matrix.job.arch }}.deb" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
+            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-${{ matrix.job.arch }}.rpm" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
+            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-suse-${{ matrix.job.arch }}.rpm" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
+            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-${{ matrix.job.arch }}.pkg.tar.zst" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client || true
 
       - name: send file to api server
         if: ${{ env.rdgen == 'false' }}
-        shell: bash
-        run: |
-          curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-${{ matrix.job.arch }}.deb" ${{ env.apiServer }}/api/save_custom_client
-          curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-${{ matrix.job.arch }}.rpm" ${{ env.apiServer }}/api/save_custom_client
-          curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-suse-${{ matrix.job.arch }}.rpm" ${{ env.apiServer }}/api/save_custom_client
-          curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-${{ matrix.job.arch }}.pkg.tar.zst" ${{ env.apiServer }}/api/save_custom_client || true
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          shell: bash
+          command: |
+            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-${{ matrix.job.arch }}.deb" ${{ env.apiServer }}/api/save_custom_client
+            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-${{ matrix.job.arch }}.rpm" ${{ env.apiServer }}/api/save_custom_client
+            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-suse-${{ matrix.job.arch }}.rpm" ${{ env.apiServer }}/api/save_custom_client
+            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./output/${{ env.filename }}-${{ matrix.job.arch }}.pkg.tar.zst" ${{ env.apiServer }}/api/save_custom_client || true
 
       - name: Upload deb
         uses: actions/upload-artifact@master
@@ -666,48 +646,17 @@ jobs:
           - { target: x86_64-unknown-linux-gnu, arch: x86_64 }
           - { target: aarch64-unknown-linux-gnu, arch: aarch64 }
     steps:
-      - name: install python deps
-        run: |
-          pip install requests pyzipper
-      - name: Download, Decrypt, and Mask
-        shell: python
-        run: |
-          import requests
-          import pyzipper
-          import io
-          import os
-          import json
-          import time
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        
+      - uses: actions/download-artifact@v4
+        with:
+          name: encrypted-secrets-zip
 
-          for attempt in range(5):
-            try:
-              print(f"Downloading secrets (Attempt {attempt + 1})...")
-              r = requests.get('${{ fromJson(inputs.zip_url).url }}/get_zip?filename=${{ fromJson(inputs.zip_url).file }}', timeout=60)
-              r.raise_for_status()
-              break
-            except (requests.exceptions.RequestException, requests.exceptions.Timeout) as e:
-              if attempt < 4:
-                print(f"Timeout/Error occurred: {e}. Retrying in 5 seconds...")
-                time.sleep(30)
-              else:
-                print("Max retries reached. Failing.")
-                raise e
-          
-          try:
-            with pyzipper.AESZipFile(io.BytesIO(r.content)) as zf:
-              zf.setpassword('${{ secrets.ZIP_PASSWORD }}'.encode())
-              with zf.open('secrets.json') as f:
-                secrets = json.load(f)
-          except Exception as e:
-            print(f"Error: Could not decrypt ZIP. Check if password matches. {e}")
-            exit(1)
-
-          with open(os.environ['GITHUB_ENV'], 'a') as env_file:
-            for key, value in secrets.items():
-              print(f"::add-mask::{value}")
-              env_file.write(f"{key}={value}\n")
-          
-          print("Secrets loaded into environment.")
+      - name: Load Secrets
+        uses: ./.github/actions/decrypt-secrets
+        with:
+          zip_password: ${{ secrets.ZIP_PASSWORD }}
 
       - name: Checkout source code
         if: ${{ env.VERSION != 'master' }}
@@ -749,15 +698,39 @@ jobs:
 
       - name: send file to rdgen server
         if: ${{ env.rdgen == 'true' }}
-        shell: bash
-        run: |
-          curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./appimage/${{ env.filename }}-${{ matrix.job.arch }}.AppImage" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          shell: bash
+          command: |
+            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./appimage/${{ env.filename }}-${{ matrix.job.arch }}.AppImage" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
           
       - name: send file to api server
         if: ${{ env.rdgen == 'false' }}
-        shell: bash
-        run: |
-          curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./appimage/${{ env.filename }}-${{ matrix.job.arch }}.AppImage" ${{ env.apiServer }}/api/save_custom_client
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          shell: bash
+          command: |
+            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./appimage/${{ env.filename }}-${{ matrix.job.arch }}.AppImage" ${{ env.apiServer }}/api/save_custom_client
+
+      - name: failed
+        if: failure()
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: ${{ env.STATUS_URL }}
+          method: 'POST'
+          customHeaders: '{"Content-Type": "application/json"}'
+          data: '{"uuid": "${{ env.uuid }}", "status": "Generation failed, try again"}'
+
+      - name: failed
+        if: cancelled()
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: ${{ env.STATUS_URL }}
+          method: 'POST'
+          customHeaders: '{"Content-Type": "application/json"}'
+          data: '{"uuid": "${{ env.uuid }}", "status": "Generation cancelled, try again"}'
 
   build-flatpak:
     name: Build flatpak ${{ matrix.job.target }}${{ matrix.job.suffix }}
@@ -784,48 +757,17 @@ jobs:
               suffix: "",
             }
     steps:
-      - name: install python deps
-        run: |
-          pip install requests pyzipper
-      - name: Download, Decrypt, and Mask
-        shell: python
-        run: |
-          import requests
-          import pyzipper
-          import io
-          import os
-          import json
-          import time
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        
+      - uses: actions/download-artifact@v4
+        with:
+          name: encrypted-secrets-zip
 
-          for attempt in range(5):
-            try:
-              print(f"Downloading secrets (Attempt {attempt + 1})...")
-              r = requests.get('${{ fromJson(inputs.zip_url).url }}/get_zip?filename=${{ fromJson(inputs.zip_url).file }}', timeout=60)
-              r.raise_for_status()
-              break
-            except (requests.exceptions.RequestException, requests.exceptions.Timeout) as e:
-              if attempt < 4:
-                print(f"Timeout/Error occurred: {e}. Retrying in 5 seconds...")
-                time.sleep(30)
-              else:
-                print("Max retries reached. Failing.")
-                raise e
-          
-          try:
-            with pyzipper.AESZipFile(io.BytesIO(r.content)) as zf:
-              zf.setpassword('${{ secrets.ZIP_PASSWORD }}'.encode())
-              with zf.open('secrets.json') as f:
-                secrets = json.load(f)
-          except Exception as e:
-            print(f"Error: Could not decrypt ZIP. Check if password matches. {e}")
-            exit(1)
-
-          with open(os.environ['GITHUB_ENV'], 'a') as env_file:
-            for key, value in secrets.items():
-              print(f"::add-mask::{value}")
-              env_file.write(f"{key}={value}\n")
-          
-          print("Secrets loaded into environment.")
+      - name: Load Secrets
+        uses: ./.github/actions/decrypt-secrets
+        with:
+          zip_password: ${{ secrets.ZIP_PASSWORD }}
 
       - name: Checkout source code
         if: ${{ env.VERSION != 'master' }}
@@ -883,66 +825,56 @@ jobs:
 
       - name: send file to rdgen server
         if: ${{ env.rdgen == 'true' }}
-        continue-on-error: true
-        shell: bash
-        run: |
-          curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./flatpak/${{ env.filename }}-${{ matrix.job.arch }}.flatpak" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          shell: bash
+          command: |
+            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./flatpak/${{ env.filename }}-${{ matrix.job.arch }}.flatpak" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
           
       - name: send file to api server
         if: ${{ env.rdgen == 'false' }}
-        continue-on-error: true
-        shell: bash
-        run: |
-          curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./flatpak/${{ env.filename }}-${{ matrix.job.arch }}.flatpak" ${{ env.apiServer }}/api/save_custom_client
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          shell: bash
+          command: |
+            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./flatpak/${{ env.filename }}-${{ matrix.job.arch }}.flatpak" ${{ env.apiServer }}/api/save_custom_client
 
+      - name: failed
+        if: failure()
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: ${{ env.STATUS_URL }}
+          method: 'POST'
+          customHeaders: '{"Content-Type": "application/json"}'
+          data: '{"uuid": "${{ env.uuid }}", "status": "Generation failed, try again"}'
 
+      - name: failed
+        if: cancelled()
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: ${{ env.STATUS_URL }}
+          method: 'POST'
+          customHeaders: '{"Content-Type": "application/json"}'
+          data: '{"uuid": "${{ env.uuid }}", "status": "Generation cancelled, try again"}'
 
   deploy:
     needs: [build-rustdesk-linux,build-flatpak,build-appimage]
+    if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: install python deps
-        run: |
-          pip install requests pyzipper
-      - name: Download, Decrypt, and Mask
-        shell: python
-        run: |
-          import requests
-          import pyzipper
-          import io
-          import os
-          import json
-          import time
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        
+      - uses: actions/download-artifact@v4
+        with:
+          name: encrypted-secrets-zip
 
-          for attempt in range(5):
-            try:
-              print(f"Downloading secrets (Attempt {attempt + 1})...")
-              r = requests.get('${{ fromJson(inputs.zip_url).url }}/get_zip?filename=${{ fromJson(inputs.zip_url).file }}', timeout=60)
-              r.raise_for_status()
-              break
-            except (requests.exceptions.RequestException, requests.exceptions.Timeout) as e:
-              if attempt < 4:
-                print(f"Timeout/Error occurred: {e}. Retrying in 5 seconds...")
-                time.sleep(30)
-              else:
-                print("Max retries reached. Failing.")
-                raise e
-          
-          try:
-            with pyzipper.AESZipFile(io.BytesIO(r.content)) as zf:
-              zf.setpassword('${{ secrets.ZIP_PASSWORD }}'.encode())
-              with zf.open('secrets.json') as f:
-                secrets = json.load(f)
-          except Exception as e:
-            print(f"Error: Could not decrypt ZIP. Check if password matches. {e}")
-            exit(1)
-
-          with open(os.environ['GITHUB_ENV'], 'a') as env_file:
-            for key, value in secrets.items():
-              print(f"::add-mask::{value}")
-              env_file.write(f"{key}={value}\n")
-          
-          print("Secrets loaded into environment.")
+      - name: Load Secrets
+        uses: ./.github/actions/decrypt-secrets
+        with:
+          zip_password: ${{ secrets.ZIP_PASSWORD }}
 
       - name: Finalize and Cleanup zip/json
         if: always() # Run even if previous steps fail

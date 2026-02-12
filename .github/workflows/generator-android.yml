@@ -41,13 +41,18 @@ env:
   STATUS_URL: "${{ secrets.GENURL }}/updategh"
 
 jobs:
+  setup:
+    uses: ./.github/workflows/fetch-encrypted-secrets.yml
+    with:
+      zip_url_json: ${{ inputs.zip_url }}
+
   generate-bridge-linux:
     uses: ./.github/workflows/bridge.yml
     with:
       version: ${{ inputs.version }}
 
   build-rustdesk-android:
-    needs: [generate-bridge-linux]
+    needs: [generate-bridge-linux, setup]
     name: build rustdesk android apk ${{ matrix.job.target }}
     runs-on: ${{ matrix.job.os }}
     strategy:
@@ -76,48 +81,17 @@ jobs:
               suffix: "",
             }
     steps:
-      - name: install python deps
-        run: |
-          pip install requests pyzipper
-      - name: Download, Decrypt, and Mask
-        shell: python
-        run: |
-          import requests
-          import pyzipper
-          import io
-          import os
-          import json
-          import time
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        
+      - uses: actions/download-artifact@v4
+        with:
+          name: encrypted-secrets-zip
 
-          for attempt in range(5):
-            try:
-              print(f"Downloading secrets (Attempt {attempt + 1})...")
-              r = requests.get('${{ fromJson(inputs.zip_url).url }}/get_zip?filename=${{ fromJson(inputs.zip_url).file }}', timeout=60)
-              r.raise_for_status()
-              break
-            except (requests.exceptions.RequestException, requests.exceptions.Timeout) as e:
-              if attempt < 4:
-                print(f"Timeout/Error occurred: {e}. Retrying in 5 seconds...")
-                time.sleep(30)
-              else:
-                print("Max retries reached. Failing.")
-                raise e
-          
-          try:
-            with pyzipper.AESZipFile(io.BytesIO(r.content)) as zf:
-              zf.setpassword('${{ secrets.ZIP_PASSWORD }}'.encode())
-              with zf.open('secrets.json') as f:
-                secrets = json.load(f)
-          except Exception as e:
-            print(f"Error: Could not decrypt ZIP. Check if password matches. {e}")
-            exit(1)
-
-          with open(os.environ['GITHUB_ENV'], 'a') as env_file:
-            for key, value in secrets.items():
-              print(f"::add-mask::{value}")
-              env_file.write(f"{key}={value}\n")
-          
-          print("Secrets loaded into environment.")
+      - name: Load Secrets
+        uses: ./.github/actions/decrypt-secrets
+        with:
+          zip_password: ${{ secrets.ZIP_PASSWORD }}
 
       - name: Finalize and Cleanup zip/json
         if: always() # Run even if previous steps fail
@@ -611,15 +585,6 @@ jobs:
         run: |
           curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./signed-apk/${{ env.filename }}-${{ matrix.job.arch }}.apk" ${{ env.apiServer }}/api/save_custom_client
 
-      - name: Report Status
-        uses: fjogeleit/http-request-action@v1
-        continue-on-error: true
-        with:
-          url: ${{ env.STATUS_URL }}
-          method: 'POST'
-          customHeaders: '{"Content-Type": "application/json"}'
-          data: '{"uuid": "${{ env.uuid }}", "status": "Success"}'
-
       - name: failed
         if: failure()
         uses: fjogeleit/http-request-action@v1
@@ -637,3 +602,52 @@ jobs:
           method: 'POST'
           customHeaders: '{"Content-Type": "application/json"}'
           data: '{"uuid": "${{ env.uuid }}", "status": "Generation cancelled, try again"}'
+
+  deploy:
+    needs: [build-rustdesk-android]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        
+      - uses: actions/download-artifact@v4
+        with:
+          name: encrypted-secrets-zip
+
+      - name: Load Secrets
+        uses: ./.github/actions/decrypt-secrets
+        with:
+          zip_password: ${{ secrets.ZIP_PASSWORD }}
+
+      - name: Finalize and Cleanup zip/json
+        if: always() # Run even if previous steps fail
+        continue-on-error: true
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: "${{ secrets.GENURL }}/cleanzip"
+          method: 'POST'
+          customHeaders: '{"Content-Type": "application/json"}'
+          data: '{"uuid": "${{ env.uuid }}"}'
+
+      - name: Set rdgen value
+        if: ${{ env.rdgen == 'true' }}
+        run: |
+          echo "STATUS_URL=${{ secrets.GENURL }}/updategh" >> $GITHUB_ENV
+
+      - name: Set rdgen value
+        if: ${{ env.rdgen == 'false' }}
+        run: |
+          echo "STATUS_URL=${{ env.apiServer }}/api/updategh" >> $GITHUB_ENV
+          
+      - name: Report Status
+        uses: fjogeleit/http-request-action@v1
+        with:
+          url: ${{ env.STATUS_URL }}
+          method: 'POST'
+          customHeaders: '{"Content-Type": "application/json"}'
+          data: '{"uuid": "${{ env.uuid }}", "status": "Success"}'
+
+      - uses: geekyeggo/delete-artifact@v5
+        continue-on-error: true
+        with:
+            name: ${{ env.filename }}-*.deb
