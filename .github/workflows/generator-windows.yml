@@ -261,13 +261,17 @@ jobs:
           #sed -i '/intl:/a \ \ archive: ^3.6.1' ./flutter/pubspec.yaml
 
       - name: allow custom.txt
-        continue-on-error: true
-        run: |
-          Invoke-WebRequest -Uri https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/allowCustom.py -OutFile allowCustom.py
-          python allowCustom.py
-          # Remove Setup Server Tip
-          Invoke-WebRequest -Uri https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/removeSetupServerTip.diff -OutFile removeSetupServerTip.diff
-          git apply removeSetupServerTip.diff
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 1
+          max_attempts: 3
+          shell: pwsh
+          command: |
+            Invoke-WebRequest -Uri https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/allowCustom.py -OutFile allowCustom.py
+            python allowCustom.py
+            # Remove Setup Server Tip
+            Invoke-WebRequest -Uri https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/removeSetupServerTip.diff -OutFile removeSetupServerTip.diff
+            git apply removeSetupServerTip.diff
 
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v1
@@ -363,23 +367,27 @@ jobs:
           
       - name: magick stuff
         if: ${{ env.iconlink_url != 'false' }}
-        continue-on-error: true
-        run: |
-          Invoke-WebRequest -Uri ${{ env.iconlink_url }}/get_png?filename=${{ env.iconlink_file }}"&"uuid=${{ env.iconlink_uuid }} -OutFile ./res/iconx.png 
-          mv ./res/icon.ico ./res/icon.ico.bak
-          mv ./res/icon.png ./res/icon.png.bak
-          mv ./res/tray-icon.ico ./res/tray-icon.ico.bak
-          mv ./res/iconx.png ./res/icon.png
-          mv ./res/32x32.png ./res/32x32.png.bak
-          mv ./res/64x64.png ./res/64x64.png.bak
-          mv ./res/128x128.png ./res/128x128.png.bak
-          mv ./res/128x128@2x.png ./res/128x128@2x.png.bak
-          magick ./res/icon.png -define icon:auto-resize=256,64,48,32,16 ./res/icon.ico
-          cp ./res/icon.ico ./res/tray-icon.ico
-          magick ./res/icon.png -resize 32x32 ./res/32x32.png
-          magick ./res/icon.png -resize 64x64 ./res/64x64.png
-          magick ./res/icon.png -resize 128x128 ./res/128x128.png
-          magick ./res/128x128.png -resize 200% ./res/128x128@2x.png
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 1
+          max_attempts: 3
+          shell: pwsh
+          command: |
+            Invoke-WebRequest -Uri ${{ env.iconlink_url }}/get_png?filename=${{ env.iconlink_file }}"&"uuid=${{ env.iconlink_uuid }} -OutFile ./res/iconx.png 
+            mv ./res/icon.ico ./res/icon.ico.bak
+            mv ./res/icon.png ./res/icon.png.bak
+            mv ./res/tray-icon.ico ./res/tray-icon.ico.bak
+            mv ./res/iconx.png ./res/icon.png
+            mv ./res/32x32.png ./res/32x32.png.bak
+            mv ./res/64x64.png ./res/64x64.png.bak
+            mv ./res/128x128.png ./res/128x128.png.bak
+            mv ./res/128x128@2x.png ./res/128x128@2x.png.bak
+            magick ./res/icon.png -define icon:auto-resize=256,64,48,32,16 ./res/icon.ico
+            cp ./res/icon.ico ./res/tray-icon.ico
+            magick ./res/icon.png -resize 32x32 ./res/32x32.png
+            magick ./res/icon.png -resize 64x64 ./res/64x64.png
+            magick ./res/icon.png -resize 128x128 ./res/128x128.png
+            magick ./res/128x128.png -resize 200% ./res/128x128@2x.png
 
 
       - name: ui.rs icon
@@ -400,18 +408,28 @@ jobs:
           sed -i -e 's|!key.is_empty()|false|' ./src/client.rs
 
       - name: add cycle monitors to toolbar
-        continue-on-error: true
         if: env.cycleMonitor == 'true'
-        run: |
-          Invoke-WebRequest -Uri https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/cycle_monitor.diff -OutFile cycle_monitor.diff
-          git apply cycle_monitor.diff
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 1
+          max_attempts: 3
+          shell: pwsh
+          continue-on-error: true
+          command: |
+            Invoke-WebRequest -Uri https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/cycle_monitor.diff -OutFile cycle_monitor.diff
+            git apply cycle_monitor.diff
 
       - name: use X for offline display instead of orange circle
-        continue-on-error: true
         if: env.xOffline == 'true'
-        run: |
-          Invoke-WebRequest -Uri https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/xoffline.diff -OutFile xoffline.diff
-          git apply xoffline.diff
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 1
+          max_attempts: 3
+          shell: pwsh
+          continue-on-error: true
+          command: |
+            Invoke-WebRequest -Uri https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/xoffline.diff -OutFile xoffline.diff
+            git apply xoffline.diff
 
       - name: removeNewVersionNotif
         continue-on-error: true
@@ -457,7 +475,7 @@ jobs:
           url: ${{ env.STATUS_URL }}
           method: 'POST'
           customHeaders: '{"Content-Type": "application/json"}'
-          data: '{"uuid": "${{ env.uuid }}", "status": "50% complete, this step takes about 5 minutes, be patient."}'
+          data: '{"uuid": "${{ env.uuid }}", "status": "50% complete"}'
 
       - name: Build rustdesk
         run: |
@@ -508,9 +526,14 @@ jobs:
 
       - name: logo stuff
         if: ${{ env.logolink_url != 'false' }}
-        continue-on-error: true
-        run: |
-          Invoke-WebRequest -Uri ${{ env.logolink_url }}/get_png?filename=${{ env.logolink_file }}"&"uuid=${{ env.logolink_uuid }} -OutFile ./rustdesk/data/flutter_assets/assets/logo.png
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 1
+          max_attempts: 3
+          shell: pwsh
+          continue-on-error: true
+          command: |
+            Invoke-WebRequest -Uri ${{ env.logolink_url }}/get_png?filename=${{ env.logolink_file }}"&"uuid=${{ env.logolink_uuid }} -OutFile ./rustdesk/data/flutter_assets/assets/logo.png
 
       - name: find Runner.res
         # Windows: find Runner.res (compiled from ./flutter/windows/runner/Runner.rc), copy to ./Runner.res
@@ -542,7 +565,7 @@ jobs:
           url: ${{ env.STATUS_URL }}
           method: 'POST'
           customHeaders: '{"Content-Type": "application/json"}'
-          data: '{"uuid": "${{ env.uuid }}", "status": "70% complete, this step takes about 5 minutes, be patient."}'
+          data: '{"uuid": "${{ env.uuid }}", "status": "70% complete"}'
       
       - name: zip dlls
         continue-on-error: true
@@ -655,17 +678,25 @@ jobs:
 
       - name: send file to rdgen server
         if: ${{ env.rdgen == 'true' }}
-        shell: bash
-        run: |
-          curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.exe" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
-          curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.msi" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client || true
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 1
+          max_attempts: 3
+          shell: bash
+          command: |
+            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.exe" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
+            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.msi" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client || true
 
       - name: send file to api server
         if: ${{ env.rdgen == 'false' }}
-        shell: bash
-        run: |
-          curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.exe" ${{ env.apiServer }}/api/save_custom_client
-          curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.msi" ${{ env.apiServer }}/api/save_custom_client || true
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 1
+          max_attempts: 3
+          shell: bash
+          command: |
+            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.exe" ${{ env.apiServer }}/api/save_custom_client
+            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.msi" ${{ env.apiServer }}/api/save_custom_client || true
 
       - name: Report Status
         uses: fjogeleit/http-request-action@v1
@@ -696,9 +727,10 @@ jobs:
   cleanup:
     needs: [build-for-windows-flutter]
     runs-on: ubuntu-latest
+    continue-on-error: true
     if: always()
     steps:
       - name: Delete secrets artifact
-        uses: geekyeggo/delete-artifact@v1
+        uses: geekyeggo/delete-artifact@v5
         with:
           name: encrypted-secrets-zip

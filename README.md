@@ -11,6 +11,10 @@ If you would like to host the generator yourself, see [here](setup.md)
 - Set default settings for the client
 - Support for rustdesk advanced settings (https://rustdesk.com/docs/en/self-host/client-configuration/advanced-settings/)
 
+## Generate RustDesk clients from command line instead of using a web browser
+
+Save your configuration from the rdgen web interface, or generate your own, then use that json file with [@AlekseyLapunov's rdgen-cli](https://github.com/AlekseyLapunov/rdgen-cli) to build from the command line on Windows, Linux, or MacOS like this: `python rdgen-cli -f my_config.json --set-version 1.4.5 --set-platform windows -s https://rdgen.crayoneater.org`
+
 ## Notes
 
 - Icons should be square (256x256 recommended)

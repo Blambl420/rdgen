@@ -4,6 +4,7 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.core.files.base import ContentFile
 import os
+import secrets
 import re
 import requests
 import base64
@@ -21,6 +22,11 @@ def generator_view(request):
     if request.method == 'POST':
         form = GenerateForm(request.POST, request.FILES)
         if form.is_valid():
+            user_secret = form.cleaned_data['sh_secret_field']
+            if _settings.SH_SECRET == user_secret:
+                selfhosted = True
+            else:
+                selfhosted = False
             platform = form.cleaned_data['platform']
             version = form.cleaned_data['version']
             delayFix = form.cleaned_data['delayFix']
@@ -225,6 +231,8 @@ def generator_view(request):
             ####from here run the github action, we need user, repo, access token.
             if platform == 'windows':
                 url = 'https://api.github.com/repos/'+_settings.GHUSER+'/'+_settings.REPONAME+'/actions/workflows/generator-windows.yml/dispatches'
+                if selfhosted:
+                    url = 'https://api.github.com/repos/'+_settings.GHUSER+'/'+_settings.REPONAME+'/actions/workflows/sh-generator-windows.yml/dispatches'
             if platform == 'windows-x86':
                 url = 'https://api.github.com/repos/'+_settings.GHUSER+'/'+_settings.REPONAME+'/actions/workflows/generator-windows-x86.yml/dispatches'
             elif platform == 'linux':
@@ -235,6 +243,8 @@ def generator_view(request):
                 url = 'https://api.github.com/repos/'+_settings.GHUSER+'/'+_settings.REPONAME+'/actions/workflows/generator-macos.yml/dispatches'
             else:
                 url = 'https://api.github.com/repos/'+_settings.GHUSER+'/'+_settings.REPONAME+'/actions/workflows/generator-windows.yml/dispatches'
+                if selfhosted:
+                    url = 'https://api.github.com/repos/'+_settings.GHUSER+'/'+_settings.REPONAME+'/actions/workflows/sh-generator-windows.yml/dispatches'
 
             #url = 'https://api.github.com/repos/'+_settings.GHUSER+'/rustdesk/actions/workflows/test.yml/dispatches'  
             inputs_raw = {
@@ -278,7 +288,6 @@ def generator_view(request):
                 zf.setpassword(_settings.ZIP_PASSWORD.encode())
                 zf.write(temp_json_path, arcname="secrets.json")
 
-            # 4. Cleanup the plain JSON file immediately
             if os.path.exists(temp_json_path):
                 os.remove(temp_json_path)
 
