@@ -33,6 +33,14 @@
 5. Now just run ```docker compose up -d```
 
 
+## Use a self hosted github runner for faster client generation (Windows only right now)
+
+1. First you need to set up a Windows computer that can build rustdesk
+2. Once you can build rustdesk, follow github instructions for setting up a self hosted github runner
+3. Now you need to add an environment variable SH_SECRET, which has a key/password that you will need to send to the server
+4. Save a json configuration file from your rdgen web ui
+5. Use the [rdgen-cli] (https://github.com/AlekseyLapunov/rdgen-cli) to submit your json configuration with the added key "sh_secret_field" with the value matching your SH_SECRET
+
 ## Use your own Windows code signing token
 
 1. You will need a USB signing token plugged into a Windows computer
