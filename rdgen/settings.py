@@ -35,7 +35,8 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG_ENV = os.environ.get("DEBUG", "False")
+DEBUG = DEBUG_ENV.lower() in ['true', '1', 't']
 
 ALLOWED_HOSTS = ['*']
 #CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS', '').split()
