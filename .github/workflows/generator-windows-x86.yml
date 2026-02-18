@@ -223,7 +223,7 @@ jobs:
           timeout_minutes: 1
           max_attempts: 3
           shell: pwsh
-          continue-on-error: true
+          continue_on_error: true
           command: |
             Invoke-WebRequest -Uri https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/allowCustom.diff -OutFile allowCustom.diff
             git apply allowCustom.diff

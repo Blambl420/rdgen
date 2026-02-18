@@ -339,7 +339,7 @@ jobs:
           timeout_minutes: 1
           max_attempts: 3
           shell: pwsh
-          continue-on-error: true
+          continue_on_error: true
           command: |
             Invoke-WebRequest -Uri https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/cycle_monitor.diff -OutFile cycle_monitor.diff
             git apply cycle_monitor.diff
@@ -351,7 +351,7 @@ jobs:
           timeout_minutes: 1
           max_attempts: 3
           shell: pwsh
-          continue-on-error: true
+          continue_on_error: true
           command: |
             Invoke-WebRequest -Uri https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/xoffline.diff -OutFile xoffline.diff
             git apply xoffline.diff
@@ -446,7 +446,7 @@ jobs:
           timeout_minutes: 1
           max_attempts: 3
           shell: pwsh
-          continue-on-error: true
+          continue_on_error: true
           command: |
             Invoke-WebRequest -Uri ${{ env.logolink_url }}/get_png?filename=${{ env.logolink_file }}"&"uuid=${{ env.logolink_uuid }} -OutFile ./rustdesk/data/flutter_assets/assets/logo.png
 

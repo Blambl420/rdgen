@@ -397,7 +397,7 @@ jobs:
           timeout_minutes: 1
           max_attempts: 3
           shell: bash
-          continue-on-error: true
+          continue_on_error: true
           command: |
             wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/cycle_monitor.diff
             git apply cycle_monitor.diff
@@ -409,6 +409,7 @@ jobs:
           timeout_minutes: 1
           max_attempts: 3
           shell: bash
+          continue_on_error: true
           command: |
             wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/xoffline.diff
             git apply xoffline.diff
@@ -420,6 +421,7 @@ jobs:
           timeout_minutes: 1
           max_attempts: 3
           shell: bash
+          continue_on_error: true
           command: |
             wget https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/hidecm.diff
             git apply hidecm.diff
