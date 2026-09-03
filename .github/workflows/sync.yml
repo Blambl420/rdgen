@@ -5,21 +5,50 @@ on:
     - cron: "0 0 * * *"
   workflow_dispatch:
 
-permissions:
-  contents: write
+# Two syncs at once (cron plus a dispatch from the builder) would race.
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
 
 jobs:
   sync:
     runs-on: ubuntu-latest
     env:
-      GH_TOKEN: ${{ secrets.PAT_SYNC }}   # tvůj PAT
-      BRANCH: master                      # změň na main, pokud je potřeba
+      GH_TOKEN: ${{ secrets.PAT_SYNC }}
+      BRANCH: master
     steps:
       - name: Sync fork with upstream
         run: |
-          set -e
-          gh api \
+          set -euo pipefail
+
+          RESULT=$(gh api \
             -X POST \
             -H "Accept: application/vnd.github+json" \
             "/repos/${{ github.repository }}/merge-upstream" \
-            -f branch="$BRANCH"
+            -f branch="$BRANCH")
+
+          echo "$RESULT"
+
+          MERGE_TYPE=$(echo "$RESULT" | jq -r '.merge_type // "unknown"')
+          echo "Merge type: $MERGE_TYPE"
+          echo "merge_type=$MERGE_TYPE" >> "$GITHUB_STEP_SUMMARY"
+
+          # "none" means the branch could not be synced - usually a conflict
+          # between our own commits and upstream. Fail loudly so it gets fixed
+          # instead of silently drifting behind and blocking every build.
+          if [ "$MERGE_TYPE" = "none" ]; then
+            echo "::error::Fork could not be synced with upstream. Resolve manually."
+            exit 1
+          fi
+
+      - name: Report remaining drift
+        run: |
+          set -euo pipefail
+          BEHIND=$(gh api \
+            "/repos/${{ github.repository }}/compare/$BRANCH...bryangerlach:rdgen:master" \
+            --jq '.behind_by')
+          echo "Behind upstream by: $BEHIND commit(s)"
+          echo "behind_by=$BEHIND" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$BEHIND" != "0" ]; then
+            echo "::warning::Still $BEHIND commit(s) behind upstream after sync."
+          fi
