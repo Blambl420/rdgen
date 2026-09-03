@@ -16,39 +16,74 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.PAT_SYNC }}
       BRANCH: master
+      UPSTREAM_OWNER: bryangerlach
+      UPSTREAM_REPO: rdgen
+      UPSTREAM_BRANCH: master
     steps:
       - name: Sync fork with upstream
         run: |
-          set -euo pipefail
+          set -uo pipefail
 
+          # gh exits non-zero on 409, so capture the body either way.
           RESULT=$(gh api \
             -X POST \
             -H "Accept: application/vnd.github+json" \
             "/repos/${{ github.repository }}/merge-upstream" \
-            -f branch="$BRANCH")
+            -f branch="$BRANCH" 2>&1) || true
 
           echo "$RESULT"
 
-          MERGE_TYPE=$(echo "$RESULT" | jq -r '.merge_type // "unknown"')
-          echo "Merge type: $MERGE_TYPE"
-          echo "merge_type=$MERGE_TYPE" >> "$GITHUB_STEP_SUMMARY"
+          MERGE_TYPE=$(echo "$RESULT" | jq -r '.merge_type // "unknown"' 2>/dev/null || echo unknown)
+          MESSAGE=$(echo "$RESULT" | jq -r '.message // ""' 2>/dev/null || echo "")
 
-          # "none" means the branch could not be synced - usually a conflict
-          # between our own commits and upstream. Fail loudly so it gets fixed
-          # instead of silently drifting behind and blocking every build.
-          if [ "$MERGE_TYPE" = "none" ]; then
-            echo "::error::Fork could not be synced with upstream. Resolve manually."
-            exit 1
-          fi
+          # merge_type "none" is ambiguous: it means both "nothing to do because
+          # we are already current" and "refused". The message tells them apart,
+          # so treat the happy case as success instead of failing the job.
+          case "$MERGE_TYPE" in
+            fast-forward|merge)
+              echo "Synced ($MERGE_TYPE)."
+              echo "result=synced ($MERGE_TYPE)" >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            none)
+              if echo "$MESSAGE" | grep -qi "not behind"; then
+                echo "Already up to date, nothing to merge."
+                echo "result=already up to date" >> "$GITHUB_STEP_SUMMARY"
+              else
+                echo "::error::Sync refused: $MESSAGE"
+                exit 1
+              fi
+              ;;
+            *)
+              echo "::error::Unexpected response from merge-upstream: $RESULT"
+              exit 1
+              ;;
+          esac
 
       - name: Report remaining drift
+        if: always()
         run: |
-          set -euo pipefail
-          BEHIND=$(gh api \
-            "/repos/${{ github.repository }}/compare/$BRANCH...bryangerlach:rdgen:master" \
-            --jq '.behind_by')
-          echo "Behind upstream by: $BEHIND commit(s)"
+          set -uo pipefail
+
+          # base...head: behind_by counts what the base has and the head lacks,
+          # so upstream must be the base for this to mean "how far behind we are".
+          BASEHEAD="${UPSTREAM_OWNER}:${UPSTREAM_REPO}:${UPSTREAM_BRANCH}...${{ github.repository_owner }}:${{ github.event.repository.name }}:${BRANCH}"
+
+          DRIFT=$(gh api "/repos/${{ github.repository }}/compare/${BASEHEAD}" \
+            --jq '{status: .status, behind: .behind_by, ahead: .ahead_by}' 2>/dev/null) || DRIFT=""
+
+          if [ -z "$DRIFT" ]; then
+            echo "::warning::Could not compare against upstream."
+            exit 0
+          fi
+
+          echo "$DRIFT"
+          BEHIND=$(echo "$DRIFT" | jq -r '.behind')
           echo "behind_by=$BEHIND" >> "$GITHUB_STEP_SUMMARY"
+
+          # Being ahead is normal - this fork carries its own sync.yml plus a
+          # merge commit for every past sync. Only behind_by blocks builds.
           if [ "$BEHIND" != "0" ]; then
-            echo "::warning::Still $BEHIND commit(s) behind upstream after sync."
+            echo "::warning::Still $BEHIND commit(s) behind upstream."
+          else
+            echo "Fork is current with upstream."
           fi
