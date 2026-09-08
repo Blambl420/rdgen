@@ -181,8 +181,6 @@ def generate_custom_client(params, full_url):
         decodedCustom['default-settings']['enable-remote-printer'] = 'Y' if enablePrinter else 'N'
         decodedCustom['default-settings']['enable-camera'] = 'Y' if enableCamera else 'N'
         decodedCustom['default-settings']['enable-terminal'] = 'Y' if enableTerminal else 'N'
-        decodedCustom['default-settings']['custom-rendezvous-server'] = server
-        decodedCustom['default-settings']['api-server'] = apiServer
         
 
     else:
