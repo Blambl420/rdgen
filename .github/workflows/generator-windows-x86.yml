@@ -257,13 +257,13 @@ jobs:
               format!("PREFIX{}/FILENAME", version)
           }
           
-          fn managed_update_filename(input: &str) -> Option<&'static str> {
+          fn managed_update_filename(input: &str) -> Option<String> {
               let rest = input.strip_prefix("PREFIX")?;
               let (version, filename) = rest.split_once('/')?;
               if !managed_update_version(version) || filename != "FILENAME" { return None; }
-              Some("FILENAME")
+              Some(format!("CACHEPREFIX{}-FILENAME", version))
           }
-          '''.replace('PREFIX',plan['download_prefix']).replace('FILENAME',plan['filename'])
+          '''.replace('CACHEPREFIX','rd-update-'+plan['platform']+'-'+plan['variant']+'-'+plan['arch']+'-').replace('PREFIX',plan['download_prefix']).replace('FILENAME',plan['filename'])
           
           def patch_sources(root, plan):
               root=Path(root)
@@ -312,6 +312,18 @@ jobs:
               for p in ['flutter/lib/desktop/pages/desktop_home_page.dart','flutter/lib/mobile/pages/connection_page.dart','src/ui/index.tis']:
                   source=(root/p).read_text(encoding='utf-8');replaced+=source.count('https://rustdesk.com/download')
                   changed[p]=source.replace('https://rustdesk.com/download',plan['latest_url'])
+              home='flutter/lib/desktop/pages/desktop_home_page.dart'
+              changed[home]=replace_once(changed[home],'''    if (!bind.isCustomClient() &&
+                  updateUrl.isNotEmpty &&
+                  !isCardClosed &&
+                  bind.mainUriPrefixSync().contains('rustdesk')) {''',
+                  '''    if (updateUrl.isNotEmpty && !isCardClosed) {''')
+              if plan['platform']=='windows-x86':
+                  sciter='src/ui/index.tis'
+                  changed[sciter]=replace_once(changed[sciter],
+                      "        var url = software_update_url + '.' + handler.get_software_ext();",
+                      '        var update_version = software_update_url.split("/");\n'
+                      '        var url = '+json.dumps(plan['download_prefix'])+' + update_version[update_version.length - 1] + '+json.dumps('/'+plan['filename'])+';')
               if not replaced:raise ValueError('Download button location changed upstream')
               for p,source in changed.items():(root/p).write_text(source,encoding='utf-8')
               return changed
@@ -324,6 +336,7 @@ jobs:
               # Exercise the exact Rust URL parser without compiling the entire app.
               tests=rust_helpers(plan)+'''\nfn main() {
               assert!(managed_update_filename(&managed_update_url("1.5.1")).is_some());
+              assert_ne!(managed_update_filename(&managed_update_url("1.5.1")), managed_update_filename(&managed_update_url("1.5.2")));
               for bad in ["", "../1.5.1", "1..5", "1.5.1?x=1", "1.5.1/../../"] {
                   assert!(managed_update_filename(&managed_update_url(bad)).is_none());
               }
