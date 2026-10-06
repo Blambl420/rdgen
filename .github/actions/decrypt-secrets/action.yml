@@ -1,48 +1,72 @@
-name: 'Decrypt and Mask Secrets'
-description: 'Decrypts a zip and masks the JSON contents as env vars'
+name: Decrypt and validate RDGen inputs
+description: Reject unsafe inputs before exporting any build environment variables
 inputs:
   zip_password:
-    description: 'Password for the Zip'
+    description: Password for the ZIP
     required: true
   zip_path:
-    description: 'Path to the encrypted zip'
+    description: Path to the encrypted ZIP
     required: false
-    default: 'secrets.zip'
-
+    default: secrets.zip
 runs:
-  using: "composite"
+  using: composite
   steps:
-    - name: install python deps
+    - name: Install ZIP reader
       shell: bash
-      run: |
-        pip install pyzipper
-    - name: Decrypt and Mask
+      run: python -m pip install pyzipper==0.3.6
+    - name: Decrypt, validate and mask
       shell: python
       env:
-        PYTHONUTF8: "1"
-        PYTHONIOENCODING: "utf-8"
+        PYTHONUTF8: '1'
+        PYTHONIOENCODING: utf-8
+        RD_INPUT_ZIP: ${{ inputs.zip_path }}
+        RD_INPUT_PASSWORD: ${{ inputs.zip_password }}
       run: |
-        import sys
-        import io
-        import pyzipper
+        """Validation before decrypted RDGen fields are written to GITHUB_ENV."""
+        import base64
         import json
-        import os
-
-        # Force UTF-8 stdout/stderr so secrets with characters outside
-        # the runner codepage (CJK, emoji, etc.) do not crash this step
-        # on Windows runners (default cp1251) with UnicodeEncodeError
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
-
-        with pyzipper.AESZipFile('${{ inputs.zip_path }}') as zf:
-            zf.setpassword('${{ inputs.zip_password }}'.encode())
-            with zf.open('secrets.json') as f:
-                secrets = json.load(f)
-
-        with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as env_file:
-            for key, value in secrets.items():
-                if value:
-                    print(f"::add-mask::{value}")
-                    env_file.write(f"{key}={value}\n")
+        import re
         
-        print(f"Successfully masked {len(secrets)} secrets.")
+        FIELDS = set('server serverPort key apiServer custom uuid iconlink_url iconlink_uuid iconlink_file logolink_url logolink_uuid logolink_file privacylink_url privacylink_uuid privacylink_file appname genurl urlLink downloadLink delayFix rdgen xOffline removeNewVersionNotif compname androidappid filename'.split())
+        
+        def validate_inputs(values):
+            if not isinstance(values, dict) or set(values) != FIELDS:
+                raise ValueError('Unexpected encrypted input fields; review RDGen contract')
+            for key, value in values.items():
+                if not isinstance(value, str) or any(ord(c) < 32 or ord(c) == 127 for c in value):
+                    raise ValueError('Invalid input type or control character: ' + key)
+                # Current upstream scripts substitute these values into Bash, PowerShell,
+                # sed and source strings. Reject their metacharacters before any export.
+                if re.search(r'''[;&<>\\|'"$`]''', value):
+                    raise ValueError('Unsafe build-script character: ' + key)
+                if len(value) > (4 * 1024 * 1024 if key == 'custom' else 2048):
+                    raise ValueError('Oversized build input: ' + key)
+            for key in ('uuid', 'iconlink_uuid', 'logolink_uuid', 'privacylink_uuid',
+                        'iconlink_file', 'logolink_file', 'privacylink_file', 'filename', 'androidappid'):
+                if values[key] and not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]*', values[key]):
+                    raise ValueError('Unsafe identifier: ' + key)
+            if not values['serverPort'].isdigit() or not 1 <= int(values['serverPort']) <= 65532:
+                raise ValueError('Invalid server port')
+            for key in ('delayFix', 'rdgen', 'xOffline', 'removeNewVersionNotif'):
+                if values[key] not in ('true', 'false'):
+                    raise ValueError('Invalid boolean: ' + key)
+            custom = json.loads(base64.b64decode(values['custom'], validate=True))
+            if not isinstance(custom, dict):
+                raise ValueError('Custom configuration must be an object')
+            return values
+        
+        import os
+        import pyzipper
+        with pyzipper.AESZipFile(os.environ['RD_INPUT_ZIP']) as zf:
+            zf.setpassword(os.environ['RD_INPUT_PASSWORD'].encode())
+            info = zf.getinfo('secrets.json')
+            if info.file_size > 5 * 1024 * 1024:
+                raise ValueError('Encrypted input too large')
+            values = validate_inputs(json.loads(zf.read(info)))
+        # No environment write occurs until the entire input has passed validation.
+        with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as stream:
+            for key, value in values.items():
+                if value:
+                    print('::add-mask::' + value.replace('%', '%25'))
+                    stream.write(key + '=' + value + '\n')
+        print('Validated and masked RDGen inputs')

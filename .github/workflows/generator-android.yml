@@ -398,15 +398,35 @@ jobs:
       # (Dart main_init) pass "" by default; embed the base64 config there so
       # read_custom_client() runs and presets the password + permissions.
       - name: Embed custom config for Android
-        shell: bash
+        shell: python
+        env:
+          RD_ANDROID_CUSTOM: ${{ env.custom }}
         run: |
-          KOTLIN=./flutter/android/app/src/main/kotlin/com/carriez/flutter_hbb/MainService.kt
-          DART=./flutter/lib/models/native_model.dart
-          sed -i "s|FFI.startServer(configPath, \"\")|FFI.startServer(configPath, \"${{ env.custom }}\")|" "$KOTLIN"
-          sed -i "s|customClientConfig: '',|customClientConfig: '${{ env.custom }}',|" "$DART"
-          echo "--- verify ---"
-          grep -n 'FFI.startServer(configPath' "$KOTLIN" | sed 's/\(.\{80\}\).*/\1.../'
-          grep -n 'customClientConfig:' "$DART" | sed 's/\(.\{80\}\).*/\1.../'
+          """Embed Android config with exact match counts and explicit supported signatures."""
+          import base64
+          import json
+          import os
+          import re
+          from pathlib import Path
+          
+          def embed(kotlin, dart, custom):
+              assert isinstance(json.loads(base64.b64decode(custom, validate=True)), dict)
+              kotlin, count = re.subn(r'FFI\.startServer\(configPath, (homePath, )?""\)',
+                  lambda m: 'FFI.startServer(configPath, ' + (m.group(1) or '') + '"' + custom + '")', kotlin)
+              if count != 1:
+                  raise ValueError('Unsupported Android startServer signature; review upstream change')
+              dart, count = re.subn(r"customClientConfig:\s*'',", lambda m: "customClientConfig: '" + custom + "',", dart)
+              if count != 1:
+                  raise ValueError('Unsupported Dart customClientConfig; review upstream change')
+              return kotlin, dart
+          
+          if __name__ == '__main__':
+              kotlin = Path('flutter/android/app/src/main/kotlin/com/carriez/flutter_hbb/MainService.kt')
+              dart = Path('flutter/lib/models/native_model.dart')
+              kt, dt = embed(kotlin.read_text(), dart.read_text(), os.environ['RD_ANDROID_CUSTOM'])
+              kotlin.write_text(kt)
+              dart.write_text(dt)
+              print('Android service and UI configuration embedded and verified')
 
       - name: change app id to custom
         if: env.androidappid != 'com.carriez.flutter_hbb'
@@ -491,6 +511,34 @@ jobs:
           sed -i '/ic_launcher_background/d' ./flutter/android/app/src/main/res/values/colors.xml
       ##########################################################
 
+      - name: Verify embedded server contract
+        shell: python
+        env:
+          EXPECT_SERVER: ${{ env.server }}
+          EXPECT_PORT: ${{ env.serverPort }}
+          EXPECT_KEY: ${{ env.key }}
+          EXPECT_API: ${{ env.apiServer }}
+          EXPECT_CUSTOM: ${{ env.custom }}
+        run: |
+          import os, re, base64, json
+          from pathlib import Path
+          cfg=Path('libs/hbb_common/src/config.rs').read_text()
+          common=Path('src/common.rs').read_text()
+          assert os.environ['EXPECT_SERVER'] and os.environ['EXPECT_SERVER'] in cfg, 'Server injection failed'
+          assert os.environ['EXPECT_KEY'] and os.environ['EXPECT_KEY'] in cfg, 'Public key injection failed'
+          assert os.environ['EXPECT_API'] and os.environ['EXPECT_API'] in common, 'API injection failed'
+          assert 'rs-ny.rustdesk.com' not in cfg, 'Default rendezvous server remains'
+          port=int(os.environ['EXPECT_PORT'])
+          for name, offset in [('RENDEZVOUS_PORT',0),('RELAY_PORT',1),('WS_RENDEZVOUS_PORT',2),('WS_RELAY_PORT',3)]:
+              assert re.search(r'pub const '+name+r': i32 = '+str(port+offset)+r';',cfg), 'Port injection failed: '+name
+          custom=os.environ['EXPECT_CUSTOM']
+          assert isinstance(json.loads(base64.b64decode(custom)),dict), 'Invalid custom config'
+          android=Path('flutter/android/app/src/main/kotlin/com/carriez/flutter_hbb/MainService.kt')
+          if os.environ['GITHUB_WORKFLOW'].lower().find('android')>=0:
+              assert custom in android.read_text(), 'Android service config was not embedded'
+              assert custom in Path('flutter/lib/models/native_model.dart').read_text(), 'Android UI config was not embedded'
+          assert 'read_custom_client' in Path('src/core_main.rs').read_text() or 'read_custom_client' in common, 'Custom config reader missing'
+
       - name: Build rustdesk lib
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
@@ -536,34 +584,6 @@ jobs:
           convert ./res/128x128.png -resize 200% ./flutter/assets/128x128@2x.png || true
           cp ./flutter/assets/icon.svg ./res/scalable.svg
 
-
-      - name: Verify embedded server contract
-        shell: python
-        env:
-          EXPECT_SERVER: ${{ env.server }}
-          EXPECT_PORT: ${{ env.serverPort }}
-          EXPECT_KEY: ${{ env.key }}
-          EXPECT_API: ${{ env.apiServer }}
-          EXPECT_CUSTOM: ${{ env.custom }}
-        run: |
-          import os, re, base64, json
-          from pathlib import Path
-          cfg=Path('libs/hbb_common/src/config.rs').read_text()
-          common=Path('src/common.rs').read_text()
-          assert os.environ['EXPECT_SERVER'] and os.environ['EXPECT_SERVER'] in cfg, 'Server injection failed'
-          assert os.environ['EXPECT_KEY'] and os.environ['EXPECT_KEY'] in cfg, 'Public key injection failed'
-          assert os.environ['EXPECT_API'] and os.environ['EXPECT_API'] in common, 'API injection failed'
-          assert 'rs-ny.rustdesk.com' not in cfg, 'Default rendezvous server remains'
-          port=int(os.environ['EXPECT_PORT'])
-          for name, offset in [('RENDEZVOUS_PORT',0),('RELAY_PORT',1),('WS_RENDEZVOUS_PORT',2),('WS_RELAY_PORT',3)]:
-              assert re.search(r'pub const '+name+r': i32 = '+str(port+offset)+r';',cfg), 'Port injection failed: '+name
-          custom=os.environ['EXPECT_CUSTOM']
-          assert isinstance(json.loads(base64.b64decode(custom)),dict), 'Invalid custom config'
-          android=Path('flutter/android/app/src/main/kotlin/com/carriez/flutter_hbb/MainService.kt')
-          if os.environ['GITHUB_WORKFLOW'].lower().find('android')>=0:
-              assert custom in android.read_text(), 'Android service config was not embedded'
-              assert custom in Path('flutter/lib/models/native_model.dart').read_text(), 'Android UI config was not embedded'
-          assert 'read_custom_client' in Path('src/core_main.rs').read_text() or 'read_custom_client' in common, 'Custom config reader missing'
 
       - name: Build rustdesk
         shell: bash
@@ -699,11 +719,12 @@ jobs:
                   h=hashlib.sha256()
                   for chunk in iter(lambda:stream.read(1024*1024),b''): h.update(chunk)
               rows.append({'name':p.name,'size':p.stat().st_size,'sha256':h.hexdigest()})
-          data={'contract':1,'uuid':os.environ['RECEIPT_UUID'],'run_id':os.environ['GITHUB_RUN_ID'],
+          custom=json.loads(base64.b64decode(os.environ['RECEIPT_CUSTOM']))
+          data={'contract':2,'uuid':os.environ['RECEIPT_UUID'],'run_id':os.environ['GITHUB_RUN_ID'],
             'run_attempt':os.environ['GITHUB_RUN_ATTEMPT'],'workflow_sha':os.environ['GITHUB_SHA'],
             'version':os.environ['RECEIPT_VERSION'],'source_sha':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
-            'inputs':{k:os.environ['RECEIPT_'+v] for k,v in [('serverIP','SERVER'),('serverPort','PORT'),('key','KEY'),('apiServer','API'),('downloadLink','DOWNLOAD')]},
-            'custom':json.loads(base64.b64decode(os.environ['RECEIPT_CUSTOM'])), 'files':rows}
+            'inputs_sha256':{k:hashlib.sha256(os.environ['RECEIPT_'+v].encode()).hexdigest() for k,v in [('serverIP','SERVER'),('serverPort','PORT'),('key','KEY'),('apiServer','API'),('downloadLink','DOWNLOAD')]},
+            'policy':{'has_password':bool(custom.get('password')), 'disable_settings':custom.get('disable-settings')=='Y'}, 'files':rows}
           Path('rd-receipt.json').write_text(json.dumps(data,sort_keys=True))
 
       - name: Upload trusted build receipt

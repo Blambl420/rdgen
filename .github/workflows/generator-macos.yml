@@ -811,11 +811,12 @@ jobs:
                   h=hashlib.sha256()
                   for chunk in iter(lambda:stream.read(1024*1024),b''): h.update(chunk)
               rows.append({'name':p.name,'size':p.stat().st_size,'sha256':h.hexdigest()})
-          data={'contract':1,'uuid':os.environ['RECEIPT_UUID'],'run_id':os.environ['GITHUB_RUN_ID'],
+          custom=json.loads(base64.b64decode(os.environ['RECEIPT_CUSTOM']))
+          data={'contract':2,'uuid':os.environ['RECEIPT_UUID'],'run_id':os.environ['GITHUB_RUN_ID'],
             'run_attempt':os.environ['GITHUB_RUN_ATTEMPT'],'workflow_sha':os.environ['GITHUB_SHA'],
             'version':os.environ['RECEIPT_VERSION'],'source_sha':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
-            'inputs':{k:os.environ['RECEIPT_'+v] for k,v in [('serverIP','SERVER'),('serverPort','PORT'),('key','KEY'),('apiServer','API'),('downloadLink','DOWNLOAD')]},
-            'custom':json.loads(base64.b64decode(os.environ['RECEIPT_CUSTOM'])), 'files':rows}
+            'inputs_sha256':{k:hashlib.sha256(os.environ['RECEIPT_'+v].encode()).hexdigest() for k,v in [('serverIP','SERVER'),('serverPort','PORT'),('key','KEY'),('apiServer','API'),('downloadLink','DOWNLOAD')]},
+            'policy':{'has_password':bool(custom.get('password')), 'disable_settings':custom.get('disable-settings')=='Y'}, 'files':rows}
           Path('rd-receipt.json').write_text(json.dumps(data,sort_keys=True))
 
       - name: Upload trusted build receipt
