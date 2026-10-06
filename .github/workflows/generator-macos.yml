@@ -302,6 +302,16 @@ jobs:
                   '    let update_msi = false; // Managed Windows updates use the custom EXE.')
               updater=replace_once(updater,'    let dmg_url = format!("{}/rustdesk-{}-{}.dmg", download_url, version, arch);',
                   '    let dmg_url = managed_update_url(&version);')
+              # Keep the upstream unit test aligned with this build's download policy.
+              updater=replace_once(updater,'fn update_download_file_accepts_expected_github_asset_urls()',
+                  'fn update_download_file_accepts_expected_managed_asset_url()')
+              updater=replace_once(updater,
+                  '"https://github.com/rustdesk/rustdesk/releases/download/1.4.0/rustdesk-1.4.0-x86_64.dmg"',
+                  json.dumps(plan['download_prefix']+'1.5.1/'+plan['filename']))
+              updater=replace_once(updater,'.expect("valid GitHub release asset URL")',
+                  '.expect("valid managed release asset URL")')
+              cache_name='rd-update-'+plan['platform']+'-'+plan['variant']+'-'+plan['arch']+'-1.5.1-'+plan['filename']
+              updater=replace_once(updater,'Some("rustdesk-1.4.0-x86_64.dmg")','Some('+json.dumps(cache_name)+')')
               changed={'src/common.rs':common,'src/updater.rs':updater}
               if plan['platform']!='windows-x86':
                   p='flutter/lib/desktop/widgets/update_progress.dart'
