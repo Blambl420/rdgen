@@ -87,9 +87,9 @@ jobs:
           # - { target: aarch64-pc-windows-msvc, os: windows-2022, arch: aarch64 }
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: encrypted-secrets-zip
 
@@ -101,7 +101,7 @@ jobs:
       - name: Finalize and Cleanup zip/json
         if: always() # Run even if previous steps fail
         continue-on-error: true
-        uses: fjogeleit/http-request-action@v1
+        uses: fjogeleit/http-request-action@c0b95d02a088b47c1f2f4db04fd8af8bd19eee54 # v1
         with:
           url: "${{ secrets.GENURL }}/cleanzip"
           method: 'POST'
@@ -109,7 +109,7 @@ jobs:
           data: '{"uuid": "${{ env.uuid }}"}'
 
       - name: Export GitHub Actions cache environment variables
-        uses: actions/github-script@v6
+        uses: actions/github-script@d7906e4ad0b1822421a7e6a35d5ca353c962f410 # v6
         with:
           script: |
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
@@ -127,7 +127,7 @@ jobs:
 
       - name: Checkout source code
         if: ${{ env.VERSION != 'master' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: rustdesk/rustdesk
           ref: refs/tags/${{ env.VERSION }}
@@ -135,13 +135,13 @@ jobs:
 
       - name: Checkout source code
         if: ${{ env.VERSION == 'master' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: rustdesk/rustdesk
           submodules: recursive
 
       - name: Restore bridge files
-        uses: actions/download-artifact@master
+        uses: actions/download-artifact@2a5974104b6d5dbdb2f9468a3e54da3bdd241578 # master
         with:
           name: bridge-artifact
           path: ./
@@ -255,7 +255,6 @@ jobs:
           sed -i -e 's|$downloadUrl/$downloadFile|${{ env.downloadLink }}|' ./flutter/lib/desktop/widgets/update_progress.dart
 
       - name: set server, serverPort, key, and apiserver
-        continue-on-error: true
         shell: bash
         env:
           SERVER_DOMAIN: ${{ env.server }}
@@ -306,17 +305,17 @@ jobs:
           #sed -i '/intl:/a \ \ archive: ^3.6.1' ./flutter/pubspec.yaml
 
       - name: allow custom.txt
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
         with:
           timeout_minutes: 5
           max_attempts: 3
           retry_wait_seconds: 15
           shell: pwsh
           command: |
-            Invoke-WebRequest -Uri https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/allowCustom.py -OutFile allowCustom.py
+            Invoke-WebRequest -Uri https://raw.githubusercontent.com/bryangerlach/rdgen/0e83379858ec4a2ecb8a4f832b0db5de8ab605aa/.github/patches/allowCustom.py -OutFile allowCustom.py
             python allowCustom.py
             # Remove Setup Server Tip
-            Invoke-WebRequest -Uri https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/removeSetupServerTip.diff -OutFile removeSetupServerTip.diff
+            Invoke-WebRequest -Uri https://raw.githubusercontent.com/bryangerlach/rdgen/0e83379858ec4a2ecb8a4f832b0db5de8ab605aa/.github/patches/removeSetupServerTip.diff -OutFile removeSetupServerTip.diff
             git apply removeSetupServerTip.diff
 
       - name: Patch remote printer port to spool file
@@ -369,7 +368,7 @@ jobs:
                       print("Warning: RD_PRINTER_PORT not matched in RemotePrinter.cpp")
 
       - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v1
+        uses: KyleMayes/install-llvm-action@1a3da29f56261a1e1f937ec88f0856a9b8321d7e # v1
         with:
           version: ${{ env.LLVM_VERSION }}
 
@@ -398,18 +397,18 @@ jobs:
           fi
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@v1
+        uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # v1
         with:
           toolchain: ${{ env.SCITER_RUST_VERSION }}
           targets: ${{ matrix.job.target }}
           components: "rustfmt"
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           prefix-key: ${{ matrix.job.os }}
 
       - name: Setup vcpkg with Github Actions binary cache
-        uses: lukka/run-vcpkg@v11
+        uses: lukka/run-vcpkg@b1a0dd252f06b9e25b3c022a9a03bd7a427fb6a2 # v11
         with:
           vcpkgDirectory: C:\vcpkg
           vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
@@ -437,7 +436,7 @@ jobs:
           
       - name: magick stuff
         if: ${{ env.iconlink_url != 'false' }}
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
         with:
           timeout_minutes: 5
           max_attempts: 3
@@ -487,7 +486,7 @@ jobs:
 
       - name: use X for offline display instead of orange circle
         if: env.xOffline == 'true'
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
         with:
           timeout_minutes: 5
           max_attempts: 3
@@ -495,7 +494,7 @@ jobs:
           shell: pwsh
           continue_on_error: true
           command: |
-            Invoke-WebRequest -Uri https://raw.githubusercontent.com/bryangerlach/rdgen/refs/heads/master/.github/patches/xoffline.diff -OutFile xoffline.diff
+            Invoke-WebRequest -Uri https://raw.githubusercontent.com/bryangerlach/rdgen/0e83379858ec4a2ecb8a4f832b0db5de8ab605aa/.github/patches/xoffline.diff -OutFile xoffline.diff
             git apply xoffline.diff
 
       - name: removeNewVersionNotif
@@ -530,7 +529,7 @@ jobs:
           cd ..
 
       - name: Checkout printer-adapter crate
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: bryangerlach/rdgen
           ref: master
@@ -546,6 +545,35 @@ jobs:
           } else {
             Write-Host "Error: printer-adapter folder not found in repository."
           }
+
+
+      - name: Verify embedded server contract
+        shell: python
+        env:
+          EXPECT_SERVER: ${{ env.server }}
+          EXPECT_PORT: ${{ env.serverPort }}
+          EXPECT_KEY: ${{ env.key }}
+          EXPECT_API: ${{ env.apiServer }}
+          EXPECT_CUSTOM: ${{ env.custom }}
+        run: |
+          import os, re, base64, json
+          from pathlib import Path
+          cfg=Path('libs/hbb_common/src/config.rs').read_text()
+          common=Path('src/common.rs').read_text()
+          assert os.environ['EXPECT_SERVER'] and os.environ['EXPECT_SERVER'] in cfg, 'Server injection failed'
+          assert os.environ['EXPECT_KEY'] and os.environ['EXPECT_KEY'] in cfg, 'Public key injection failed'
+          assert os.environ['EXPECT_API'] and os.environ['EXPECT_API'] in common, 'API injection failed'
+          assert 'rs-ny.rustdesk.com' not in cfg, 'Default rendezvous server remains'
+          port=int(os.environ['EXPECT_PORT'])
+          for name, offset in [('RENDEZVOUS_PORT',0),('RELAY_PORT',1),('WS_RENDEZVOUS_PORT',2),('WS_RELAY_PORT',3)]:
+              assert re.search(r'pub const '+name+r': i32 = '+str(port+offset)+r';',cfg), 'Port injection failed: '+name
+          custom=os.environ['EXPECT_CUSTOM']
+          assert isinstance(json.loads(base64.b64decode(custom)),dict), 'Invalid custom config'
+          android=Path('flutter/android/app/src/main/kotlin/com/carriez/flutter_hbb/MainService.kt')
+          if os.environ['GITHUB_WORKFLOW'].lower().find('android')>=0:
+              assert custom in android.read_text(), 'Android service config was not embedded'
+              assert custom in Path('flutter/lib/models/native_model.dart').read_text(), 'Android UI config was not embedded'
+          assert 'read_custom_client' in Path('src/core_main.rs').read_text() or 'read_custom_client' in common, 'Custom config reader missing'
 
       - name: Build rustdesk
         run: |
@@ -600,7 +628,7 @@ jobs:
 
       - name: logo stuff
         if: ${{ env.logolink_url != 'false' }}
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
         with:
           timeout_minutes: 5
           max_attempts: 3
@@ -627,7 +655,7 @@ jobs:
           fi
 
       - name: Download RustDeskTempTopMostWindow artifacts
-        uses: actions/download-artifact@master
+        uses: actions/download-artifact@2a5974104b6d5dbdb2f9468a3e54da3bdd241578 # master
         if: env.UPLOAD_ARTIFACT == 'true'
         with:
           name: topmostwindow-artifacts
@@ -680,7 +708,7 @@ jobs:
           mv ./target/release/rustdesk-portable-packer.exe "./SignOutput/rustdesk.exe"
 
       - name: Add MSBuild to PATH
-        uses: microsoft/setup-msbuild@v2
+        uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
 
       - name: Build msi
         continue-on-error: true
@@ -735,27 +763,72 @@ jobs:
 
       - name: send file to rdgen server
         if: ${{ env.rdgen == 'true' }}
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
         with:
           timeout_minutes: 10
           max_attempts: 3
           retry_wait_seconds: 15
           shell: bash
           command: |
-            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.exe" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
-            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.msi" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client || true
+            curl --fail-with-body --retry 3 -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.exe" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client
+            curl --fail-with-body --retry 3 -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.msi" -F "uuid=${{ env.uuid }}" ${{ secrets.GENURL }}/save_custom_client || true
+
+
+      - name: Record trusted build receipt
+        if: ${{ env.rdgen == 'true' }}
+        shell: python
+        env:
+          RECEIPT_UUID: ${{ env.uuid }}
+          RECEIPT_FILENAME: ${{ env.filename }}
+          RECEIPT_VERSION: ${{ inputs.version }}
+          RECEIPT_ARCH: ${{ matrix.job.arch }}
+          RECEIPT_SERVER: ${{ env.server }}
+          RECEIPT_PORT: ${{ env.serverPort }}
+          RECEIPT_KEY: ${{ env.key }}
+          RECEIPT_API: ${{ env.apiServer }}
+          RECEIPT_CUSTOM: ${{ env.custom }}
+          RECEIPT_DOWNLOAD: ${{ env.downloadLink }}
+        run: |
+          import os, json, hashlib, subprocess, base64
+          from pathlib import Path
+          folder=Path('SignOutput')
+          prefix=os.environ['RECEIPT_FILENAME']
+          suffixes=('.exe','.msi','.apk','.dmg','.deb','.rpm','.AppImage','.flatpak','.pkg.tar.zst')
+          files=sorted(p for p in folder.iterdir() if p.is_file() and p.name.startswith(prefix) and p.name.endswith(suffixes))
+          assert files, 'No artifacts available for trusted receipt'
+          rows=[]
+          for p in files:
+              with p.open('rb') as stream:
+                  h=hashlib.sha256()
+                  for chunk in iter(lambda:stream.read(1024*1024),b''): h.update(chunk)
+              rows.append({'name':p.name,'size':p.stat().st_size,'sha256':h.hexdigest()})
+          data={'contract':1,'uuid':os.environ['RECEIPT_UUID'],'run_id':os.environ['GITHUB_RUN_ID'],
+            'run_attempt':os.environ['GITHUB_RUN_ATTEMPT'],'workflow_sha':os.environ['GITHUB_SHA'],
+            'version':os.environ['RECEIPT_VERSION'],'source_sha':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
+            'inputs':{k:os.environ['RECEIPT_'+v] for k,v in [('serverIP','SERVER'),('serverPort','PORT'),('key','KEY'),('apiServer','API'),('downloadLink','DOWNLOAD')]},
+            'custom':json.loads(base64.b64decode(os.environ['RECEIPT_CUSTOM'])), 'files':rows}
+          Path('rd-receipt.json').write_text(json.dumps(data,sort_keys=True))
+
+      - name: Upload trusted build receipt
+        if: ${{ env.rdgen == 'true' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: rd-receipt-${{ github.job }}-${{ strategy.job-index }}
+          path: rd-receipt.json
+          if-no-files-found: error
+          retention-days: 30
 
       - name: send file to api server
         if: ${{ env.rdgen == 'false' }}
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
         with:
           timeout_minutes: 10
           max_attempts: 3
           retry_wait_seconds: 15
           shell: bash
           command: |
-            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.exe" ${{ env.apiServer }}/api/save_custom_client
-            curl -i -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.msi" ${{ env.apiServer }}/api/save_custom_client || true
+            curl --fail-with-body --retry 3 -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.exe" ${{ env.apiServer }}/api/save_custom_client
+            curl --fail-with-body --retry 3 -X POST -H "Content-Type: multipart/form-data" -H "Authorization: Bearer ${{ env.token }}" -F "file=@./SignOutput/${{ env.filename }}.msi" ${{ env.apiServer }}/api/save_custom_client || true
 
   cleanup:
     needs: [build-for-windows-flutter]
@@ -764,6 +837,7 @@ jobs:
     if: always()
     steps:
       - name: Delete secrets artifact
-        uses: geekyeggo/delete-artifact@v5
+        uses: geekyeggo/delete-artifact@f275313e70c08f6120db482d7a6b98377786765b # v5
         with:
           name: encrypted-secrets-zip
+

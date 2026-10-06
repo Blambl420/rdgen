@@ -87,3 +87,4 @@ jobs:
           else
             echo "Fork is current with upstream."
           fi
+
