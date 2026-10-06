@@ -600,14 +600,14 @@ jobs:
             'version':os.environ['RECEIPT_VERSION'],'source_sha':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
             'inputs_sha256':{k:hashlib.sha256(os.environ['RECEIPT_'+v].encode()).hexdigest() for k,v in [('serverIP','SERVER'),('serverPort','PORT'),('key','KEY'),('apiServer','API'),('downloadLink','DOWNLOAD')]},
             'policy':{'has_password':bool(custom.get('password')), 'disable_settings':custom.get('disable-settings')=='Y'}, 'files':rows}
-          Path('rd-receipt.json').write_text(json.dumps(data,sort_keys=True))
+          (Path(os.environ['RUNNER_TEMP'])/'rd-receipt.json').write_text(json.dumps(data,sort_keys=True),encoding='utf-8')
 
       - name: Upload trusted build receipt
         if: ${{ env.rdgen == 'true' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: rd-receipt-${{ github.job }}-${{ strategy.job-index }}
-          path: rd-receipt.json
+          path: ${{ runner.temp }}/rd-receipt.json
           if-no-files-found: error
           retention-days: 30
 
