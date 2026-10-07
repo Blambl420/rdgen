@@ -286,12 +286,25 @@ jobs:
                   '        *SOFTWARE_UPDATE_URL.lock().unwrap() = String::new();\n'
                   '        return Ok(());\n    }')
               updater=(root/'src/updater.rs').read_text(encoding='utf-8')
-              start=updater.index('pub fn get_update_download_file_from_url(url: &str) -> Option<PathBuf> {')
-              end=updater.index('\nfn is_plain_update_filename',start)
-              updater=updater[:start]+'''pub fn get_update_download_file_from_url(url: &str) -> Option<PathBuf> {
+              modern='pub fn get_update_download_file_from_url(url: &str) -> Option<PathBuf> {' in updater
+              if modern:
+                  start=updater.index('pub fn get_update_download_file_from_url(url: &str) -> Option<PathBuf> {')
+                  end=updater.index('\nfn is_plain_update_filename',start)
+                  updater=updater[:start]+'''pub fn get_update_download_file_from_url(url: &str) -> Option<PathBuf> {
               managed_update_filename(url).map(|filename| std::env::temp_dir().join(filename))
           }
           '''+rust_helpers(plan)+updater[end:]
+              else:
+                  # 1.4.8/1.4.9 predate the separate native allowlist and macOS root updater.
+                  updater=replace_once(updater,'''pub fn get_download_file_from_url(url: &str) -> Option<PathBuf> {
+              let filename = url.split('/').last()?;
+              Some(std::env::temp_dir().join(filename))
+          }''','''pub fn get_download_file_from_url(url: &str) -> Option<PathBuf> {
+              managed_update_filename(url).map(|filename| std::env::temp_dir().join(filename))
+          }
+          '''+rust_helpers(plan))
+                  if 'let dmg_url =' in updater or '#[cfg(test)]' in updater:
+                      raise ValueError('Unknown legacy updater structure; review upstream change')
               start=updater.index('        #[cfg(target_os = "windows")]\n        let download_url = if cfg!(feature = "flutter") {')
               end=updater.index('        log::debug!("New version available:',start)
               updater=updater[:start]+'''        #[cfg(target_os = "windows")]
@@ -299,18 +312,19 @@ jobs:
           '''+updater[end:]
               updater=replace_once(updater,'    let update_msi = crate::platform::is_msi_installed()? && !crate::is_custom_client();',
                   '    let update_msi = false; // Managed Windows updates use the custom EXE.')
-              updater=replace_once(updater,'    let dmg_url = format!("{}/rustdesk-{}-{}.dmg", download_url, version, arch);',
-                  '    let dmg_url = managed_update_url(&version);')
-              # Keep the upstream unit test aligned with this build's download policy.
-              updater=replace_once(updater,'fn update_download_file_accepts_expected_github_asset_urls()',
-                  'fn update_download_file_accepts_expected_managed_asset_url()')
-              updater=replace_once(updater,
-                  '"https://github.com/rustdesk/rustdesk/releases/download/1.4.0/rustdesk-1.4.0-x86_64.dmg"',
-                  json.dumps(plan['download_prefix']+'1.5.1/'+plan['filename']))
-              updater=replace_once(updater,'.expect("valid GitHub release asset URL")',
-                  '.expect("valid managed release asset URL")')
-              cache_name='rd-update-'+plan['platform']+'-'+plan['variant']+'-'+plan['arch']+'-1.5.1-'+plan['filename']
-              updater=replace_once(updater,'Some("rustdesk-1.4.0-x86_64.dmg")','Some('+json.dumps(cache_name)+')')
+              if modern:
+                  updater=replace_once(updater,'    let dmg_url = format!("{}/rustdesk-{}-{}.dmg", download_url, version, arch);',
+                      '    let dmg_url = managed_update_url(&version);')
+                  # Keep the upstream unit test aligned with this build's download policy.
+                  updater=replace_once(updater,'fn update_download_file_accepts_expected_github_asset_urls()',
+                      'fn update_download_file_accepts_expected_managed_asset_url()')
+                  updater=replace_once(updater,
+                      '"https://github.com/rustdesk/rustdesk/releases/download/1.4.0/rustdesk-1.4.0-x86_64.dmg"',
+                      json.dumps(plan['download_prefix']+'1.5.1/'+plan['filename']))
+                  updater=replace_once(updater,'.expect("valid GitHub release asset URL")',
+                      '.expect("valid managed release asset URL")')
+                  cache_name='rd-update-'+plan['platform']+'-'+plan['variant']+'-'+plan['arch']+'-1.5.1-'+plan['filename']
+                  updater=replace_once(updater,'Some("rustdesk-1.4.0-x86_64.dmg")','Some('+json.dumps(cache_name)+')')
               changed={'src/common.rs':common,'src/updater.rs':updater}
               if plan['platform']!='windows-x86':
                   p='flutter/lib/desktop/widgets/update_progress.dart'
