@@ -5,7 +5,7 @@ Run by the generator workflows against the checked-out RustDesk sources
 to match exactly once, otherwise the build stops so that an upstream change
 is noticed instead of silently producing a client without the feature.
 
-Runtime behaviour (inert unless the option allow-websocket-fallback=Y is set):
+Runtime behaviour (on by default; enable-websocket-fallback=N switches it off):
 - controlled side: two unanswered UDP registrations (~6 s) switch the
   rendezvous connection to WebSocket; while in fallback a short TCP probe of
   the native port runs periodically and switches back when it succeeds;
@@ -62,7 +62,7 @@ patch('libs/hbb_common/src/config.rs', 'ws_fallback_active', [
         '}\n'
         '\n'
         'pub fn ws_fallback_enabled() -> bool {\n'
-        '    let option = keys::OPTION_ALLOW_WEBSOCKET_FALLBACK;\n'
+        '    let option = keys::OPTION_ENABLE_WEBSOCKET_FALLBACK;\n'
         '    option2bool(option, &Config::get_option(option))\n'
         '}\n'
         '\n'
@@ -98,7 +98,7 @@ patch('libs/hbb_common/src/config.rs', 'ws_fallback_active', [
     (
         '    pub const OPTION_ALLOW_WEBSOCKET: &str = "allow-websocket";\n',
         '    pub const OPTION_ALLOW_WEBSOCKET: &str = "allow-websocket";\n'
-        '    pub const OPTION_ALLOW_WEBSOCKET_FALLBACK: &str = "allow-websocket-fallback";\n',
+        '    pub const OPTION_ENABLE_WEBSOCKET_FALLBACK: &str = "enable-websocket-fallback";\n',
     ),
 ])
 
@@ -233,28 +233,15 @@ patch('src/client.rs', 'ws_fallback', [
 ])
 
 # ------------------------------------------------------------------ Flutter
-patch('flutter/lib/consts.dart', 'kOptionAllowWebSocketFallback', [
+patch('flutter/lib/consts.dart', 'kOptionEnableWebSocketFallback', [
     (
         'const String kOptionAllowWebSocket = "allow-websocket";\n',
         'const String kOptionAllowWebSocket = "allow-websocket";\n'
-        'const String kOptionAllowWebSocketFallback = "allow-websocket-fallback";\n',
+        'const String kOptionEnableWebSocketFallback = "enable-websocket-fallback";\n',
     ),
 ])
 
-# Upstream serialises "off" for allow-* options as an empty value when the app
-# name is RustDesk (defaultOptionNo), which deletes the option and brings the
-# built-in default Y back. Store an explicit N for this key instead.
-patch('flutter/lib/common.dart', 'kOptionAllowWebSocketFallback', [
-    (
-        "  } else if (option.startsWith('allow-') ||\n"
-        '      option == kOptionStopService ||\n',
-        "  } else if ((option.startsWith('allow-') &&\n"
-        '          option != kOptionAllowWebSocketFallback) ||\n'
-        '      option == kOptionStopService ||\n',
-    ),
-])
-
-patch('flutter/lib/desktop/pages/desktop_setting_page.dart', 'kOptionAllowWebSocketFallback', [
+patch('flutter/lib/desktop/pages/desktop_setting_page.dart', 'kOptionEnableWebSocketFallback', [
     (
         '                    kOptionAllowWebSocket),\n',
         '                    kOptionAllowWebSocket),\n'
@@ -264,7 +251,7 @@ patch('flutter/lib/desktop/pages/desktop_setting_page.dart', 'kOptionAllowWebSoc
         '                    Icons.alt_route,\n'
         "                    'Automatic WebSocket fallback',\n"
         "                    translate('websocket_fallback_tip'),\n"
-        '                    kOptionAllowWebSocketFallback),\n',
+        '                    kOptionEnableWebSocketFallback),\n',
     ),
 ])
 
@@ -285,7 +272,7 @@ MOBILE_TILE = (
     '                    },\n'
     '            ),\n'
 )
-patch('flutter/lib/mobile/pages/settings_page.dart', 'kOptionAllowWebSocketFallback', [
+patch('flutter/lib/mobile/pages/settings_page.dart', 'kOptionEnableWebSocketFallback', [
     (
         '  var _allowWebSocket = false;\n',
         '  var _allowWebSocket = false;\n'
@@ -295,7 +282,7 @@ patch('flutter/lib/mobile/pages/settings_page.dart', 'kOptionAllowWebSocketFallb
         '    _allowWebSocket = mainGetBoolOptionSync(kOptionAllowWebSocket);\n',
         '    _allowWebSocket = mainGetBoolOptionSync(kOptionAllowWebSocket);\n'
         '    _allowWebSocketFallback =\n'
-        '        mainGetBoolOptionSync(kOptionAllowWebSocketFallback);\n',
+        '        mainGetBoolOptionSync(kOptionEnableWebSocketFallback);\n',
     ),
     (
         MOBILE_TILE,
@@ -305,12 +292,12 @@ patch('flutter/lib/mobile/pages/settings_page.dart', 'kOptionAllowWebSocketFallb
         "              title: Text(translate('Automatic WebSocket fallback')),\n"
         "              description: Text(translate('websocket_fallback_tip')),\n"
         '              initialValue: _allowWebSocketFallback,\n'
-        '              onToggle: isOptionFixed(kOptionAllowWebSocketFallback)\n'
+        '              onToggle: isOptionFixed(kOptionEnableWebSocketFallback)\n'
         '                  ? null\n'
         '                  : (v) async {\n'
-        '                      await mainSetBoolOption(kOptionAllowWebSocketFallback, v);\n'
+        '                      await mainSetBoolOption(kOptionEnableWebSocketFallback, v);\n'
         '                      final newValue =\n'
-        '                          await mainGetBoolOption(kOptionAllowWebSocketFallback);\n'
+        '                          await mainGetBoolOption(kOptionEnableWebSocketFallback);\n'
         '                      setState(() {\n'
         '                        _allowWebSocketFallback = newValue;\n'
         '                      });\n'
