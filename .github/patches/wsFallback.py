@@ -102,26 +102,10 @@ patch('libs/hbb_common/src/config.rs', 'ws_fallback_active', [
     ),
 ])
 
-# Upstream picks ws:// whenever the api-server option is empty, although the
-# default API is https and a self-hosted domain behind a TLS proxy answers 301
-# to plain ws. RDGen only writes api-server into the client options for
-# incoming-only builds, so the admin variant hit exactly that. Empty -> wss.
-patch('libs/hbb_common/src/websocket.rs', 'api_server.is_empty() || api_server.starts_with("https")', [
-    (
-        '        let api_server = Config::get_option("api-server");\n'
-        '        if api_server.starts_with("https") {\n'
-        '            "wss"\n'
-        '        } else {\n'
-        '            "ws"\n'
-        '        }\n',
-        '        let api_server = Config::get_option("api-server");\n'
-        '        if api_server.is_empty() || api_server.starts_with("https") {\n'
-        '            "wss"\n'
-        '        } else {\n'
-        '            "ws"\n'
-        '        }\n',
-    ),
-])
+# Note: upstream check_ws derives ws/wss from the api-server *option*, not from
+# the compiled-in default. Builds that only compile the API server in (RDGen
+# direction "both") therefore need api-server=https://... in default-settings
+# (rd.blambl.cz does this in base.json defaultManual); no code change here.
 
 # ------------------------------------------------------- controlled side
 patch('src/rendezvous_mediator.rs', 'ws_fallback', [
