@@ -292,6 +292,17 @@ jobs:
             sed -i '/adaptive_icon_foreground:/a \ \ adaptive_icon_foreground_inset: 32' ./flutter/pubspec.yaml
             sed -i '/ic_launcher_background/d' ./flutter/android/app/src/main/res/values/colors.xml
 
+      - name: Patch automatic WebSocket fallback (rd.blambl.cz)
+        shell: python
+        env:
+          RD_WS_FALLBACK_PATCH: https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/wsFallback.py
+        run: |
+          import os, subprocess, sys, urllib.request
+          path = os.path.join(os.environ['RUNNER_TEMP'], 'wsFallback.py')
+          with urllib.request.urlopen(os.environ['RD_WS_FALLBACK_PATCH'], timeout=60) as r:
+              open(path, 'wb').write(r.read())
+          subprocess.run([sys.executable, path, '.'], check=True)
+
       - name: set server, serverPort, key, and apiserver
         shell: bash
         env:
