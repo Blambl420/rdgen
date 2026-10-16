@@ -241,6 +241,19 @@ patch('flutter/lib/consts.dart', 'kOptionAllowWebSocketFallback', [
     ),
 ])
 
+# Upstream serialises "off" for allow-* options as an empty value when the app
+# name is RustDesk (defaultOptionNo), which deletes the option and brings the
+# built-in default Y back. Store an explicit N for this key instead.
+patch('flutter/lib/common.dart', 'kOptionAllowWebSocketFallback', [
+    (
+        "  } else if (option.startsWith('allow-') ||\n"
+        '      option == kOptionStopService ||\n',
+        "  } else if ((option.startsWith('allow-') &&\n"
+        '          option != kOptionAllowWebSocketFallback) ||\n'
+        '      option == kOptionStopService ||\n',
+    ),
+])
+
 patch('flutter/lib/desktop/pages/desktop_setting_page.dart', 'kOptionAllowWebSocketFallback', [
     (
         '                    kOptionAllowWebSocket),\n',
