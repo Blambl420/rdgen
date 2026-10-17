@@ -311,6 +311,7 @@ jobs:
             sed -i '/ic_launcher_background/d' ./flutter/android/app/src/main/res/values/colors.xml
 
       - name: Patch automatic WebSocket fallback (rd.blambl.cz)
+        if: startsWith(env.downloadLink, 'https://rd.blambl.cz/')
         shell: python
         env:
           RD_WS_FALLBACK_PATCH: https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/wsFallback.py

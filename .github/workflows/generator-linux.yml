@@ -273,6 +273,7 @@ jobs:
           sed -i -e 's|Purslane Ltd|${{ env.compname }}|' ./src/main.rs
           
       - name: Patch automatic WebSocket fallback (rd.blambl.cz)
+        if: startsWith(env.downloadLink, 'https://rd.blambl.cz/')
         shell: python
         env:
           RD_WS_FALLBACK_PATCH: https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/wsFallback.py
@@ -1016,6 +1017,7 @@ jobs:
           sed -i -e 's|Purslane Ltd|${{ env.compname }}|' ./src/main.rs
           
       - name: Patch automatic WebSocket fallback (rd.blambl.cz)
+        if: startsWith(env.downloadLink, 'https://rd.blambl.cz/')
         shell: python
         env:
           RD_WS_FALLBACK_PATCH: https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/wsFallback.py

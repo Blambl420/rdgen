@@ -426,6 +426,7 @@ jobs:
               print('Managed update feed and exact variant/architecture download policy embedded')
 
       - name: Patch automatic WebSocket fallback (rd.blambl.cz)
+        if: startsWith(env.downloadLink, 'https://rd.blambl.cz/')
         shell: python
         env:
           RD_WS_FALLBACK_PATCH: https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/.github/patches/wsFallback.py
