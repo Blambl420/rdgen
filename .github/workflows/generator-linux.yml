@@ -1351,7 +1351,7 @@ jobs:
             done
 
       - name: send file to rdgen server
-        if: ${{ env.rdgen == 'true' && env.DRM_SUPPORTED == 'true' }}
+        if: ${{ env.rdgen == 'true' }}
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
         with:
           timeout_minutes: 10
@@ -1407,7 +1407,7 @@ jobs:
           retention-days: 30
 
       - name: send file to api server
-        if: ${{ env.rdgen == 'false' && env.DRM_SUPPORTED == 'true' }}
+        if: ${{ env.rdgen == 'false' }}
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
         with:
           timeout_minutes: 10
