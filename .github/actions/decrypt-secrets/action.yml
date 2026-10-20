@@ -31,8 +31,9 @@ runs:
         FIELDS = set('server serverPort key apiServer custom uuid iconlink_url iconlink_uuid iconlink_file logolink_url logolink_uuid logolink_file privacylink_url privacylink_uuid privacylink_file appname genurl urlLink downloadLink delayFix rdgen xOffline removeNewVersionNotif compname androidappid filename'.split())
         
         def validate_inputs(values):
-            # Upstream added slug_appname; accept legacy ZIPs during rollout.
-            if not isinstance(values, dict) or set(values) not in (FIELDS, FIELDS | {'slug_appname'}):
+            # Accept known optional upstream fields and legacy generator ZIPs.
+            optional = {'slug_appname', 'update_public_key'}
+            if not isinstance(values, dict) or not FIELDS <= set(values) or set(values) - FIELDS - optional:
                 raise ValueError('Unexpected encrypted input fields; review RDGen contract')
             values = dict(values)
             if 'slug_appname' not in values:
@@ -41,7 +42,7 @@ runs:
                 slug = unicodedata.normalize('NFKD', values['appname']).encode('ascii', 'ignore').decode('utf-8')
                 slug = re.sub(r'[^\w\s-]', '', slug.lower()).strip()
                 values['slug_appname'] = re.sub(r'[-\s]+', '-', slug)
-            if not re.fullmatch(r'[a-z0-9_][a-z0-9_-]*', values.get('slug_appname', '')):
+            if not isinstance(values['slug_appname'], str) or not re.fullmatch(r'[a-z0-9_][a-z0-9_-]*', values['slug_appname']):
                 raise ValueError('Unsafe slug_appname')
             for key, value in values.items():
                 if not isinstance(value, str) or any(ord(c) < 32 or ord(c) == 127 for c in value):
@@ -52,6 +53,17 @@ runs:
                     raise ValueError('Unsafe build-script character: ' + key)
                 if len(value) > (4 * 1024 * 1024 if key == 'custom' else 2048):
                     raise ValueError('Oversized build input: ' + key)
+            public_key = values.get('update_public_key', '')
+            if public_key:
+                if re.fullmatch(r'[0-9a-fA-F]{64}', public_key):
+                    decoded_key = bytes.fromhex(public_key)
+                else:
+                    try:
+                        decoded_key = base64.b64decode(public_key, validate=True)
+                    except ValueError as exc:
+                        raise ValueError('Invalid update_public_key encoding') from exc
+                if len(decoded_key) != 32:
+                    raise ValueError('update_public_key must be a 32-byte Ed25519 public key')
             for key in ('uuid', 'iconlink_uuid', 'logolink_uuid', 'privacylink_uuid',
                         'iconlink_file', 'logolink_file', 'privacylink_file', 'filename', 'androidappid'):
                 if values[key] and not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]*', values[key]):
