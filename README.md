@@ -23,7 +23,8 @@ jobs do with the RustDesk sources. A daily `sync.yml` merges upstream
 - `.github/actions/decrypt-secrets`: the decrypted build inputs are
   validated (allowed field names, no control or shell metacharacters,
   numeric port, valid base64 JSON config) before anything is written to
-  `GITHUB_ENV`; secrets are never echoed into logs.
+  `GITHUB_ENV`; secrets are never echoed into logs. The validator accepts the
+  upstream `slug_appname` field and derives the same safe slug for older ZIPs.
 - "Verify embedded server contract": after the sources are patched, the
   job asserts that the server, ports, public key, API server and custom
   config really ended up in the RustDesk sources (including both Android
@@ -71,6 +72,14 @@ port 443 of the ID-server host, and the client needs the `api-server`
 option set to an `https://` URL (rd.blambl.cz prefills it through
 default-settings) so that the upstream code picks `wss` instead of `ws`.
 
+
+## rustdesk api server integration
+
+The rdgen client generator is integrated into my fork of the [rustdesk-api](https://github.com/bryangerlach/rustdesk-api). This is currently a work in progress, and might have bugs.
+
+## rdgen local build alternative
+
+If you would prefer to build rustdesk on your own computer, check out the [DVForge](https://github.com/VenimK/DVForge) project.
 
 ## Features
 

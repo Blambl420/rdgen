@@ -32,7 +32,7 @@ env:
   # for arm64 linux because official Dart SDK does not work
   FLUTTER_ELINUX_VERSION: "3.16.9"
   TAG_NAME: "${{ inputs.upload-tag }}"
-  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+  VCPKG_BINARY_SOURCES: "clear"
   # vcpkg version: 2024.07.12
   VCPKG_COMMIT_ID: "${{ inputs.version == 'master' && '9e593bb18ea69cc5095e012465dcd675a822ed0d' || '120deac3062162151622ca4860575a33844ba10b' }}"
   ARMV7_VCPKG_COMMIT_ID: "6f29f12e82a8293156836ad81cc9bf5af41fe836"
@@ -149,20 +149,7 @@ jobs:
         shell: bash
         run: |
           sed -i -e 's|^version = ".*"|version = "${{ inputs.app_version }}"|' ./Cargo.toml
-          APP_VERSION="${{ inputs.app_version }}" python3 -c "
-          import re, os
-          ver = os.environ['APP_VERSION']
-          with open('./Cargo.toml', 'r') as f:
-              toml = f.read()
-          m = re.search(r'^\s*name\s*=\s*\"([^\"]+)\"', toml, re.MULTILINE)
-          pkg = m.group(1) if m else 'rustdesk'
-          with open('./Cargo.lock', 'r') as f:
-              content = f.read()
-          pattern = r'(\[\[package\]\]\s+name = \"' + re.escape(pkg) + r'\"\s+version = \")[^\"]*(\"])'
-          content = re.sub(pattern, r'\g<1>' + ver + r'\g<2>', content, count=1)
-          with open('./Cargo.lock', 'w') as f:
-              f.write(content)
-          "
+          sed -i '/name = "rustdesk"/ {n; s/version = ".*"/version = "${{ inputs.app_version }}"/}' ./Cargo.lock
           grep '^version = ' ./Cargo.toml
 
       - name: Apply allow_custom_update patch

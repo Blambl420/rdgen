@@ -26,12 +26,23 @@ runs:
         import base64
         import json
         import re
+        import unicodedata
         
         FIELDS = set('server serverPort key apiServer custom uuid iconlink_url iconlink_uuid iconlink_file logolink_url logolink_uuid logolink_file privacylink_url privacylink_uuid privacylink_file appname genurl urlLink downloadLink delayFix rdgen xOffline removeNewVersionNotif compname androidappid filename'.split())
         
         def validate_inputs(values):
-            if not isinstance(values, dict) or set(values) != FIELDS:
+            # Upstream added slug_appname; accept legacy ZIPs during rollout.
+            if not isinstance(values, dict) or set(values) not in (FIELDS, FIELDS | {'slug_appname'}):
                 raise ValueError('Unexpected encrypted input fields; review RDGen contract')
+            values = dict(values)
+            if 'slug_appname' not in values:
+                if not isinstance(values.get('appname'), str):
+                    raise ValueError('Invalid appname')
+                slug = unicodedata.normalize('NFKD', values['appname']).encode('ascii', 'ignore').decode('utf-8')
+                slug = re.sub(r'[^\w\s-]', '', slug.lower()).strip()
+                values['slug_appname'] = re.sub(r'[-\s]+', '-', slug)
+            if not re.fullmatch(r'[a-z0-9_][a-z0-9_-]*', values.get('slug_appname', '')):
+                raise ValueError('Unsafe slug_appname')
             for key, value in values.items():
                 if not isinstance(value, str) or any(ord(c) < 32 or ord(c) == 127 for c in value):
                     raise ValueError('Invalid input type or control character: ' + key)
