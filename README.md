@@ -10,12 +10,12 @@ This fork is the build backend for the managed RustDesk clients at
 [rdgen.blambl.cz](https://rdgen.blambl.cz). The generator web app itself
 (`rdgenerator/`, `rdgen/`, Docker image) is **unchanged** from upstream; every
 change lives under `.github/` and only affects what the GitHub Actions build
-jobs do with the RustDesk sources. A daily `sync.yml` merges upstream
+jobs do with the RustDesk sources. The server builder dispatches `sync.yml` when an upstream merge is needed. It merges upstream
 `bryangerlach/rdgen` into this fork.
 
 ### 1. Upstream sync and CI hardening (all builds)
 
-- `.github/workflows/sync.yml`: scheduled merge of upstream `master`
+- `.github/workflows/sync.yml`: builder-scheduled or manual merge of upstream `master`
   (GitHub "merge-upstream" API); the builder refuses to build while the fork
   is behind upstream.
 - Third-party actions are pinned to commit SHAs, artifact actions use v4,
@@ -99,3 +99,7 @@ Save your configuration from the rdgen web interface, or generate your own, then
 - Avoid special characters or non-English characters in app name and file name
 - Build time is currently 30 - 45 minutes
 
+
+### Sync incident handling (2026-11-03)
+
+The server builder persists the upstream/fork revision pair and skips a repeated known merge conflict until either revision changes. Other failed attempts have a six-hour cooldown. The duplicate GitHub cron is removed; manual workflow dispatch remains available. A workflow monitor reports blocked updates independently of the running service. No conflict is resolved by overwriting the fork or disabling build gates.
