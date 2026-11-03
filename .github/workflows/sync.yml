@@ -1,8 +1,7 @@
 name: Sync upstream
 
 on:
-  schedule:
-    - cron: "0 0 * * *"
+  # Scheduled by the server builder, which deduplicates known conflicts.
   workflow_dispatch:
 
 # Two syncs at once (cron plus a dispatch from the builder) would race.

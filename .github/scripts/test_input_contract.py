@@ -32,9 +32,9 @@ class InputContractTests(unittest.TestCase):
                     schemas.append(keys)
         self.assertEqual(len(schemas), 1)
         data = fixture()
-        data.update(slug_appname='rustdesk-admin', update_public_key='')
+        data.update(update_public_key='')
         self.assertEqual(set(data), schemas[0])
-        self.assertEqual(set(validate(data)), schemas[0])
+        self.assertEqual(set(validate(data)), schemas[0] | {'slug_appname'})
 
     def test_legacy_and_optional_combinations(self):
         for slug in (False, True):
